@@ -69,6 +69,7 @@ DMA 支持通过环境变量进行灵活配置，以下是支持的变量列表�
 | `PORT` | `9000` | Web 界面访问端口 |
 | `DMA_MODE` | `manager` | 运行模式，可选 `manager` (管理端) 或 `agent` (被控端) |
 | `DMA_SECRET` | - | Agent 模式下的连接密钥，用于安全认证 |
+| `LOGIN_USER` | `admin` | 自定义登录用户名 |
 | `LOGIN_PASSWORD` | `admin` | 自定义登录密码 |
 
 ## 📚 模板库变量使用说明
