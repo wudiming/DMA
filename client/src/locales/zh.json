@@ -24,10 +24,10 @@
     },
     "common": {
         "confirm": "确定",
-        "restart_no": "不重启 (no)",
-        "restart_always": "总是重启 (always)",
-        "restart_on_failure": "失败时重启 (on-failure)",
-        "restart_unless_stopped": "除非手动停止 (unless-stopped)",
+        "restart_no": "不重启 (No)",
+        "restart_always": "总是重启 (Always)",
+        "restart_on_failure": "失败时重启 (On Failure)",
+        "restart_unless_stopped": "除非手动停止 (Unless Stopped)",
         "network_bridge": "Bridge (默认)",
         "network_host": "Host",
         "network_none": "None",
@@ -52,7 +52,19 @@
         "none": "无",
         "unknown": "未知",
         "unused": "未使用",
-        "system": "系统"
+        "system": "系统",
+        "no_data": "暂无数据"
+    },
+    "logs": {
+        "title": "容器日志",
+        "refresh": "刷新",
+        "copy": "复制",
+        "download": "下载",
+        "no_logs": "暂无日志",
+        "auto_scroll": "自动滚动到底部",
+        "tail_lines": "显示最近 500 行",
+        "copy_success": "日志已复制到剪贴板",
+        "fetch_fail": "错误: 无法获取日志"
     },
     "container": {
         "running": "运行中",
@@ -115,6 +127,7 @@
         "env_vars": "环境变量",
         "add_env": "添加变量",
         "restart_policy": "重启策略",
+        "stack_update": "堆栈更新",
         "network_mode": "网络模式",
         "always_pull": "总是拉取最新镜像",
         "auto_scroll": "自动滚动",
@@ -138,10 +151,13 @@
         "no_ports": "暂无端口映射",
         "no_volumes": "暂无卷挂载",
         "no_env": "暂无环境变量",
-        "network_bridge": "Bridge (默认)",
-        "network_host": "Host",
-        "network_none": "None",
-        "network_custom": "Custom"
+        "env_var_name": "变量名",
+        "env_var_value": "值",
+        "add_env_var": "添加环境变量",
+        "total_env_vars": "共 {{count}} 个变量",
+        "port_placeholder": "8080:80 (主机端口:容器端口)",
+        "volume_placeholder": "/host/path:/container/path (主机路径:容器路径)",
+        "env_placeholder": "ENV_NAME=value (变量名=值)"
     },
     "dashboard": {
         "cpu_usage": "CPU 使用率",
@@ -227,7 +243,15 @@
         "delete_confirm": "确定要删除镜像 {{id}} 吗？",
         "prune_confirm": "确定要删除所有未使用的镜像吗？此操作不可恢复。",
         "prune_success": "清理完成，释放空间: {{size}} MB",
-        "pull_placeholder": "输入镜像名称 (例如: nginx:latest)"
+        "pull_placeholder": "输入镜像名称 (例如: nginx:latest)",
+        "pull_title": "拉取镜像: {{name}}",
+        "image_name": "镜像名称",
+        "pull_button": "拉取",
+        "pull_hint": "支持 Docker Hub 官方镜像，格式：镜像名:标签",
+        "total_size": "拉取的数据总量",
+        "pulling": "正在拉取中...",
+        "complete": "完成",
+        "layer_status": "层 {{id}}: {{status}}"
     },
     "endpoint": {
         "title": "DOCKER节点",

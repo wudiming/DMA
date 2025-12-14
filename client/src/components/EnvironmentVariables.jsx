@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Input, Button, Space, Tag } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import React from 'react';
+import { Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useThemeStore } from '../store/themeStore';
 
 /**
  * EnvironmentVariables Component
@@ -10,6 +11,10 @@ import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
  * @param {Function} onChange - 变化回调
  */
 export default function EnvironmentVariables({ value = [], onChange }) {
+    const { t } = useTranslation();
+    const { theme } = useThemeStore();
+    const isDark = theme === 'dark';
+
     const handleAdd = () => {
         onChange([...value, { name: '', value: '' }]);
     };
@@ -26,41 +31,45 @@ export default function EnvironmentVariables({ value = [], onChange }) {
     };
 
     return (
-        <div className="environment-variables">
+        <div className="space-y-3">
             {value.map((env, index) => (
-                <div key={index} className="flex gap-2 mb-2 items-center">
-                    <Input
-                        className="flex-1"
-                        placeholder="变量名"
+                <div key={index} className="flex gap-2 items-center">
+                    <input
+                        type="text"
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm border ${isDark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:bg-white/10' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:bg-gray-50'} focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all`}
+                        placeholder={t('container.env_var_name')}
                         value={env.name}
                         onChange={(e) => handleChange(index, 'name', e.target.value)}
                     />
-                    <Input
-                        className="flex-1"
-                        placeholder="值"
+                    <input
+                        type="text"
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm border ${isDark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:bg-white/10' : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400 focus:bg-gray-50'} focus:outline-none focus:ring-1 focus:ring-cyan-500 transition-all`}
+                        placeholder={t('container.env_var_value')}
                         value={env.value}
                         onChange={(e) => handleChange(index, 'value', e.target.value)}
                     />
-                    <Button
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
+                    <button
                         onClick={() => handleRemove(index)}
-                    />
+                        className={`p-2 rounded-lg transition-colors ${isDark ? 'text-red-400 hover:bg-red-500/10' : 'text-red-500 hover:bg-red-50'}`}
+                        title={t('common.remove')}
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
                 </div>
             ))}
-            <Button
-                type="dashed"
+
+            <button
                 onClick={handleAdd}
-                block
-                icon={<PlusOutlined />}
+                className={`w-full py-2 rounded-lg border border-dashed flex items-center justify-center gap-2 text-sm transition-all ${isDark ? 'border-white/20 text-gray-400 hover:border-cyan-500/50 hover:text-cyan-400 hover:bg-cyan-500/5' : 'border-gray-300 text-gray-500 hover:border-cyan-500 hover:text-cyan-600 hover:bg-cyan-50'}`}
             >
-                添加环境变量
-            </Button>
+                <Plus className="w-4 h-4" />
+                {t('container.add_env_var')}
+            </button>
+
             {value.length > 0 && (
-                <Tag color="blue" style={{ marginTop: 8 }}>
-                    共 {value.length} 个变量
-                </Tag>
+                <div className={`text-xs ${isDark ? 'text-cyan-400' : 'text-cyan-600'} px-1`}>
+                    {t('container.total_env_vars', { count: value.length })}
+                </div>
             )}
         </div>
     );

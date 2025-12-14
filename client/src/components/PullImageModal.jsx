@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { X, Plus, Download } from 'lucide-react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 export default function PullImageModal({ isDark, onClose, onSuccess }) {
+    const { t } = useTranslation();
     const [imageName, setImageName] = useState('');
     const [loading, setLoading] = useState(false);
     const [isFinished, setIsFinished] = useState(false);
@@ -98,7 +100,7 @@ export default function PullImageModal({ isDark, onClose, onSuccess }) {
             // onSuccess(); // Don't close automatically
         } catch (error) {
             console.error('Failed to pull image:', error);
-            alert(`拉取失败: ${error.message}`);
+            alert(`${t('common.error')}: ${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -125,7 +127,7 @@ export default function PullImageModal({ isDark, onClose, onSuccess }) {
             <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-4xl border shadow-2xl flex flex-col max-h-[80vh]`}>
                 <div className={`flex items-center justify-between p-6 border-b ${isDark ? 'border-white/10' : 'border-gray-200'} flex-shrink-0`}>
                     <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        拉取镜像: {imageName || '...'}
+                        {imageName ? t('image.pull_title', { name: imageName }) : t('image.pull')}
                     </h2>
                     {!loading && (
                         <button
@@ -142,14 +144,14 @@ export default function PullImageModal({ isDark, onClose, onSuccess }) {
                         <form onSubmit={handlePull} className="flex-shrink-0">
                             <div className="mb-4">
                                 <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                    镜像名称
+                                    {t('image.image_name')}
                                 </label>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
                                         value={imageName}
                                         onChange={(e) => setImageName(e.target.value)}
-                                        placeholder="例如: nginx:latest"
+                                        placeholder={t('image.pull_placeholder')}
                                         className={`flex-1 px-4 py-3 rounded-lg ${isDark ? 'glass text-white placeholder-gray-500' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                                         disabled={loading}
                                     />
@@ -158,11 +160,11 @@ export default function PullImageModal({ isDark, onClose, onSuccess }) {
                                         className="px-6 py-3 rounded-lg font-medium bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                                         disabled={loading || !imageName.trim()}
                                     >
-                                        拉取
+                                        {t('image.pull_button')}
                                     </button>
                                 </div>
                                 <p className={`mt-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                                    支持 Docker Hub 官方镜像，格式：镜像名:标签
+                                    {t('image.pull_hint')}
                                 </p>
                             </div>
                         </form>
@@ -188,7 +190,7 @@ export default function PullImageModal({ isDark, onClose, onSuccess }) {
                                                 <div key={id} className="text-xs">
                                                     <div className="flex justify-between mb-1">
                                                         <span className={isCompleted ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-gray-400' : 'text-gray-500')}>
-                                                            Layer {id}: {layer.status}
+                                                            {t('image.layer_status', { id, status: layer.status })}
                                                         </span>
                                                         {showProgress && (
                                                             <span className={isCompleted ? (isDark ? 'text-cyan-400' : 'text-cyan-600') : (isDark ? 'text-gray-500' : 'text-gray-400')}>
@@ -215,18 +217,18 @@ export default function PullImageModal({ isDark, onClose, onSuccess }) {
                             {(loading || isFinished) && (
                                 <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-gray-200'} flex justify-between items-center`}>
                                     <div className={`font-bold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        拉取的数据总量: {formatSize(pullState.totalSize)} MB
+                                        {t('image.total_size')}: {formatSize(pullState.totalSize)} MB
                                     </div>
                                     {loading ? (
                                         <div className="animate-pulse text-cyan-500">
-                                            正在拉取中...
+                                            {t('image.pulling')}
                                         </div>
                                     ) : (
                                         <button
                                             onClick={onSuccess}
                                             className="px-6 py-2 rounded-lg font-medium bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600 transition-all"
                                         >
-                                            完成
+                                            {t('image.complete')}
                                         </button>
                                     )}
                                 </div>

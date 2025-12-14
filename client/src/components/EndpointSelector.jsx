@@ -1,16 +1,30 @@
 import { Server, ChevronDown, Check } from 'lucide-react';
 import { useEndpoint } from '../context/EndpointContext';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export default function EndpointSelector({ isDark, popupDirection = 'down' }) {
     const { t } = useTranslation();
     const { currentEndpoint, endpoints, switchEndpoint } = useEndpoint();
     const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef(null);
     const currentEndpointData = endpoints.find(e => e.id === currentEndpoint);
 
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (containerRef.current && !containerRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
     return (
-        <div className="mb-6">
+        <div className="mb-6" ref={containerRef}>
             <div className={`text-xs font-medium mb-2 ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
                 {t('endpoint.title')}
             </div>

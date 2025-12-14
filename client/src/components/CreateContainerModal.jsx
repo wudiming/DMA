@@ -805,7 +805,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                             type="text"
                                                             value={port}
                                                             onChange={(e) => updateField('ports', index, e.target.value)}
-                                                            placeholder="8080:80 (主机端口:容器端口)"
+                                                            placeholder={t('container.port_placeholder')}
                                                             className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
                                                         />
                                                         <button
@@ -845,7 +845,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                             type="text"
                                                             value={volume}
                                                             onChange={(e) => updateField('volumes', index, e.target.value)}
-                                                            placeholder="/host/path:/container/path (主机路径:容器路径)"
+                                                            placeholder={t('container.volume_placeholder')}
                                                             className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
                                                         />
                                                         <button
@@ -885,7 +885,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                             type="text"
                                                             value={envVar}
                                                             onChange={(e) => updateField('env', index, e.target.value)}
-                                                            placeholder="ENV_NAME=value (变量名=值)"
+                                                            placeholder={t('container.env_placeholder')}
                                                             className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
                                                         />
                                                         <button
@@ -913,9 +913,9 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                 onChange={(e) => setFormData({ ...formData, network: e.target.value })}
                                                 className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
                                             >
-                                                <option value="bridge" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.network_bridge')}</option>
-                                                <option value="host" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.network_host')}</option>
-                                                <option value="none" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.network_none')}</option>
+                                                <option value="bridge" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.network_bridge')}</option>
+                                                <option value="host" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.network_host')}</option>
+                                                <option value="none" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.network_none')}</option>
                                                 <option value="container" className={isDark ? 'bg-gray-800 text-white' : ''}>Container</option>
                                             </select>
                                         </div>
@@ -932,10 +932,10 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                 onChange={(e) => setFormData({ ...formData, restart: e.target.value })}
                                                 className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
                                             >
-                                                <option value="no" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.restart_no')}</option>
-                                                <option value="always" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.restart_always')}</option>
-                                                <option value="on-failure" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.restart_on_failure')}</option>
-                                                <option value="unless-stopped" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.restart_unless_stopped')}</option>
+                                                <option value="no" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.restart_no')}</option>
+                                                <option value="always" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.restart_always')}</option>
+                                                <option value="on-failure" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.restart_on_failure')}</option>
+                                                <option value="unless-stopped" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.restart_unless_stopped')}</option>
                                             </select>
                                         </div>
                                     </div>

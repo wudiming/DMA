@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Copy, RefreshCw, Download } from 'lucide-react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 export default function ContainerLogs({ container, isDark, onClose }) {
+    const { t } = useTranslation();
     const [logs, setLogs] = useState('');
     const [loading, setLoading] = useState(true);
     const [autoScroll, setAutoScroll] = useState(true);
@@ -28,7 +30,7 @@ export default function ContainerLogs({ container, isDark, onClose }) {
             setLogs(response.data);
         } catch (error) {
             console.error('Failed to fetch logs:', error);
-            setLogs(`错误: 无法获取日志\n${error.message}`);
+            setLogs(`${t('logs.fetch_fail')}\n${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -36,7 +38,7 @@ export default function ContainerLogs({ container, isDark, onClose }) {
 
     const handleCopy = () => {
         navigator.clipboard.writeText(logs);
-        alert('日志已复制到剪贴板');
+        alert(t('logs.copy_success'));
     };
 
     const handleDownload = () => {
@@ -65,7 +67,7 @@ export default function ContainerLogs({ container, isDark, onClose }) {
                 <div className={`flex items-center justify-between p-6 border-b ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
                     <div>
                         <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                            容器日志
+                            {t('logs.title')}
                         </h2>
                         <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                             {containerName}
@@ -76,21 +78,21 @@ export default function ContainerLogs({ container, isDark, onClose }) {
                         <button
                             onClick={fetchLogs}
                             className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`}
-                            title="刷新"
+                            title={t('logs.refresh')}
                         >
                             <RefreshCw className="w-5 h-5" />
                         </button>
                         <button
                             onClick={handleCopy}
                             className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`}
-                            title="复制"
+                            title={t('logs.copy')}
                         >
                             <Copy className="w-5 h-5" />
                         </button>
                         <button
                             onClick={handleDownload}
                             className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`}
-                            title="下载"
+                            title={t('logs.download')}
                         >
                             <Download className="w-5 h-5" />
                         </button>
@@ -115,7 +117,7 @@ export default function ContainerLogs({ container, isDark, onClose }) {
                         </div>
                     ) : (
                         <pre className={`whitespace-pre-wrap break-words ${isDark ? 'text-gray-300' : 'text-gray-800'}`}>
-                            {logs || '暂无日志'}
+                            {logs || t('logs.no_logs')}
                             <div ref={logsEndRef} />
                         </pre>
                     )}
@@ -131,12 +133,12 @@ export default function ContainerLogs({ container, isDark, onClose }) {
                             className="w-4 h-4 rounded border-gray-300"
                         />
                         <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            自动滚动到底部
+                            {t('logs.auto_scroll')}
                         </span>
                     </label>
 
                     <span className={`text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                        显示最近 500 行
+                        {t('logs.tail_lines')}
                     </span>
                 </div>
             </div>

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // 真正的Squarified TreeMap算法实现
 function squarify(data, x, y, width, height) {
@@ -152,6 +153,8 @@ export default function UniversalTreeMap({
     isDark,
     onItemClick
 }) {
+    const { t } = useTranslation();
+
     const treeMapData = useMemo(() => {
         if (!data || data.length === 0) return [];
 
@@ -192,7 +195,7 @@ export default function UniversalTreeMap({
                 style={{ width, height }}
             >
                 <p className={isDark ? 'text-gray-500' : 'text-gray-400'}>
-                    暂无数据
+                    {t('common.no_data')}
                 </p>
             </div>
         );

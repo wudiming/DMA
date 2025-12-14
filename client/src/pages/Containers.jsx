@@ -861,7 +861,7 @@ function UnraidContainerCard({
                 className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all ${isDark ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
               >
                 {isStack ? <Boxes className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-                <span>{isStack ? t('container.update_available') : t('common.update')}</span>
+                <span>{isStack ? t('container.stack_update') : t('common.update')}</span>
               </button>
             )}
             {updateStatus === 'updating' && (

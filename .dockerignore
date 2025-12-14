@@ -10,3 +10,6 @@ temp_*
 test
 docs
 *.log
+server/public
+*.md
+coverage
