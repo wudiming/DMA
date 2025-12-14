@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 import os from 'os';
 import https from 'https';
-import { startAgent } from './agent.js';
+// import { startAgent } from './agent.js'; // Removed: Handled by index.js
 import { exec } from 'child_process';
 import util from 'util';
 import { StackManager } from './services/StackManager.js';
@@ -33,9 +33,9 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-if (process.env.DMA_MODE === 'agent') {
-  startAgent();
-}
+// if (process.env.DMA_MODE === 'agent') {
+//   startAgent();
+// }
 
 // 中间件
 app.use(cors());
@@ -842,22 +842,19 @@ app.post('/api/containers/create', async (req, res) => {
         const iconFilename = `${name}${ext}`;
         const iconPath = path.join(ICON_DIR, iconFilename);
 
-        await new Promise((resolve, reject) => {
-          const file = fs.createWriteStream(iconPath);
-          https.get(iconUrl, (response) => {
-            if (response.statusCode !== 200) {
-              reject(new Error(`Status ${response.statusCode}`));
-              return;
+        await new Promise(async (resolve, reject) => {
+          try {
+            const response = await fetch(iconUrl);
+            if (!response.ok) {
+              throw new Error(`Status ${response.status} ${response.statusText}`);
             }
-            response.pipe(file);
-            file.on('finish', () => {
-              file.close();
-              resolve();
-            });
-          }).on('error', (err) => {
+            const arrayBuffer = await response.arrayBuffer();
+            fs.writeFileSync(iconPath, Buffer.from(arrayBuffer));
+            resolve();
+          } catch (err) {
             fs.unlink(iconPath, () => { }); // 删除可能损坏的文件
             reject(err);
-          });
+          }
         });
 
         finalLabels['ICON_URL'] = `/icon/${iconFilename}`;
@@ -2316,6 +2313,72 @@ app.post('/api/stacks', async (req, res) => {
   }
 });
 
+
+// ========== 用户容器模板 API ==========
+const USER_TEMPLATES_FILE = path.join(DATA_DIR, 'user_templates.json');
+
+// Get user templates
+app.get('/api/templates/user', (req, res) => {
+  try {
+    if (fs.existsSync(USER_TEMPLATES_FILE)) {
+      const data = fs.readFileSync(USER_TEMPLATES_FILE, 'utf8');
+      res.json(JSON.parse(data));
+    } else {
+      res.json([]);
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Save user template
+app.post('/api/templates/user', (req, res) => {
+  const { name, data } = req.body;
+  try {
+    let templates = [];
+    if (fs.existsSync(USER_TEMPLATES_FILE)) {
+      templates = JSON.parse(fs.readFileSync(USER_TEMPLATES_FILE, 'utf8'));
+    }
+
+    const existingIndex = templates.findIndex(t => t.name === name);
+    // Keep original ID if exists, otherwise generate new one
+    const id = existingIndex >= 0 ? templates[existingIndex].id : Date.now().toString();
+
+    const newTemplate = {
+      id,
+      name,
+      data,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      templates[existingIndex] = newTemplate;
+    } else {
+      templates.push(newTemplate);
+    }
+
+    fs.writeFileSync(USER_TEMPLATES_FILE, JSON.stringify(templates, null, 2));
+    res.json({ success: true, template: newTemplate });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete user template
+app.delete('/api/templates/user/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    if (fs.existsSync(USER_TEMPLATES_FILE)) {
+      let templates = JSON.parse(fs.readFileSync(USER_TEMPLATES_FILE, 'utf8'));
+      templates = templates.filter(t => t.id !== id);
+      fs.writeFileSync(USER_TEMPLATES_FILE, JSON.stringify(templates, null, 2));
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== 模板 API ==========
 // ⚠️ 重要：模板相关路由必须在 /api/stacks/:name 之前定义
 // 因为Express按顺序匹配路由，/api/stacks/:name 会匹配 /api/stacks/templates
@@ -3044,6 +3107,40 @@ app.post('/api/stacks/:name/import-config', async (req, res) => {
     saveStackMetadata(name, metadata);
     stacks.set(stackId, metadata);
     console.log(`[Stack Import] Metadata saved for: ${name}`);
+
+    // 5. 自动保存为模板
+    try {
+      console.log(`[Stack Import] Auto-saving template for: ${name}`);
+      const templateDir = path.join(TEMPLATES_DIR, name);
+
+      if (!fs.existsSync(templateDir)) {
+        fs.mkdirSync(templateDir, { recursive: true });
+      }
+
+      // 复制 compose 文件
+      const templateComposePath = path.join(templateDir, 'docker-compose.yml');
+      fs.writeFileSync(templateComposePath, composeContent, 'utf8');
+
+      // 创建模板信息
+      const templateInfo = {
+        name,
+        title: name,
+        description: description || `Imported from stack ${name}`,
+        category: 'Custom',
+        tags: ['Imported'],
+        author: 'User',
+        createdAt: new Date().toISOString(),
+        composeContent // Store in memory
+      };
+
+      // 保存模板信息
+      saveTemplateInfo(name, templateInfo);
+      templates.set(name, templateInfo);
+      console.log(`[Stack Import] Template ${name} saved successfully`);
+    } catch (templateError) {
+      console.error(`[Stack Import] Failed to auto-save template:`, templateError);
+      // 不阻断主流程
+    }
 
 
 

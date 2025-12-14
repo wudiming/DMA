@@ -125,7 +125,12 @@ export default function Containers() {
   const fetchContainers = async () => {
     try {
       const response = await axios.get('/api/containers');
-      setContainers(response.data);
+      const sorted = response.data.sort((a, b) => {
+        const nameA = a.Names[0]?.replace(/^\//, '') || '';
+        const nameB = b.Names[0]?.replace(/^\//, '') || '';
+        return nameA.localeCompare(nameB);
+      });
+      setContainers(sorted);
     } catch (error) {
       console.error('Failed to fetch containers:', error);
     }
@@ -738,7 +743,10 @@ function UnraidContainerCard({
                   <UnraidMenuItem
                     icon={<ExternalLink className="w-4 h-4" />}
                     label={t('container.open_webui')}
-                    onClick={() => window.open(webUIUrl, '_blank')}
+                    onClick={() => {
+                      window.open(webUIUrl, '_blank');
+                      onIconClick(); // Close menu
+                    }}
                     isDark={isDark}
                   />
                   <UnraidMenuDivider isDark={isDark} />
@@ -748,7 +756,10 @@ function UnraidContainerCard({
               <UnraidMenuItem
                 icon={<Terminal className="w-4 h-4" />}
                 label={t('container.shell')}
-                onClick={() => handleShowTerminal(container)}
+                onClick={() => {
+                  handleShowTerminal(container);
+                  onIconClick(); // Close menu
+                }}
                 isDark={isDark}
                 disabled={!isRunning}
               />
@@ -761,7 +772,10 @@ function UnraidContainerCard({
                     <UnraidMenuItem
                       icon={<Play className="w-4 h-4" />}
                       label={t('container.start')}
-                      onClick={() => handleAction(container, 'start')}
+                      onClick={() => {
+                        handleAction(container, 'start');
+                        onIconClick(); // Close menu
+                      }}
                       isDark={isDark}
                     />
                   )}
@@ -769,7 +783,10 @@ function UnraidContainerCard({
                     <UnraidMenuItem
                       icon={<Square className="w-4 h-4" />}
                       label={t('container.stop')}
-                      onClick={() => handleAction(container, 'stop')}
+                      onClick={() => {
+                        handleAction(container, 'stop');
+                        onIconClick(); // Close menu
+                      }}
                       isDark={isDark}
                     />
                   )}
@@ -777,7 +794,10 @@ function UnraidContainerCard({
                     <UnraidMenuItem
                       icon={<Pause className="w-4 h-4" />}
                       label={t('container.pause')}
-                      onClick={() => handleAction(container, 'pause')}
+                      onClick={() => {
+                        handleAction(container, 'pause');
+                        onIconClick(); // Close menu
+                      }}
                       isDark={isDark}
                     />
                   )}
@@ -785,14 +805,20 @@ function UnraidContainerCard({
                     <UnraidMenuItem
                       icon={<PlayCircle className="w-4 h-4" />}
                       label={t('container.resume')}
-                      onClick={() => handleAction(container, 'unpause')}
+                      onClick={() => {
+                        handleAction(container, 'unpause');
+                        onIconClick(); // Close menu
+                      }}
                       isDark={isDark}
                     />
                   )}
                   <UnraidMenuItem
                     icon={<RotateCw className="w-4 h-4" />}
                     label={t('container.restart')}
-                    onClick={() => handleAction(container, 'restart')}
+                    onClick={() => {
+                      handleAction(container, 'restart');
+                      onIconClick(); // Close menu
+                    }}
                     isDark={isDark}
                   />
                 </>
@@ -803,7 +829,10 @@ function UnraidContainerCard({
               <UnraidMenuItem
                 icon={<FileText className="w-4 h-4" />}
                 label={t('container.logs')}
-                onClick={() => handleShowLogs(container)}
+                onClick={() => {
+                  handleShowLogs(container);
+                  onIconClick(); // Close menu
+                }}
                 isDark={isDark}
               />
 
@@ -812,7 +841,10 @@ function UnraidContainerCard({
                   <UnraidMenuItem
                     icon={<Edit className="w-4 h-4" />}
                     label={t('common.edit')}
-                    onClick={() => handleShowUpdate(container)}
+                    onClick={() => {
+                      handleShowUpdate(container);
+                      onIconClick(); // Close menu
+                    }}
                     isDark={isDark}
                   />
                   <UnraidMenuItem
@@ -820,6 +852,7 @@ function UnraidContainerCard({
                     label={t('common.remove')}
                     onClick={() => {
                       onDeleteClick(container);
+                      onIconClick(); // Close menu
                     }}
                     isDark={isDark}
                     danger
@@ -857,7 +890,10 @@ function UnraidContainerCard({
             )}
             {updateStatus === 'available' && (
               <button
-                onClick={isStack ? () => navigate('/stacks') : updateContainer}
+                onClick={isStack ? () => {
+                  localStorage.setItem('dma_stacks_active_tab', 'stacks');
+                  navigate('/stacks');
+                } : updateContainer}
                 className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all ${isDark ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
               >
                 {isStack ? <Boxes className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}

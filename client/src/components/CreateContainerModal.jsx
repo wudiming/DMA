@@ -80,6 +80,22 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
         }
     };
 
+    const handleDeleteTemplate = async (templateId, e) => {
+        e.preventDefault();
+        if (!window.confirm(t('common.confirm_delete') || 'Are you sure you want to delete this template?')) return;
+
+        try {
+            await axios.delete(`/api/templates/user/${templateId}`);
+            if (selectedTemplate === templateId) {
+                setSelectedTemplate('');
+            }
+            fetchTemplates();
+        } catch (err) {
+            console.error('Failed to delete template:', err);
+            alert('Failed to delete template');
+        }
+    };
+
     const handleTemplateSelect = (e) => {
         const templateId = e.target.value;
         setSelectedTemplate(templateId);
@@ -383,15 +399,13 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
             };
 
             // 自动保存为模板
-            if (!isEdit) {
-                try {
-                    await axios.post('/api/templates/user', {
-                        name: formData.name,
-                        data: formData
-                    });
-                } catch (err) {
-                    console.warn('Failed to auto-save template:', err);
-                }
+            try {
+                await axios.post('/api/templates/user', {
+                    name: formData.name,
+                    data: formData
+                });
+            } catch (err) {
+                console.warn('Failed to auto-save template:', err);
             }
 
             const response = await fetch('/api/containers/create', {
@@ -646,6 +660,16 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     <option key={t.id} value={t.id}>{t.name}</option>
                                                 ))}
                                             </select>
+                                            {selectedTemplate && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDeleteTemplate(selectedTemplate, e)}
+                                                    className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                                    title={t('common.delete')}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     )}
 

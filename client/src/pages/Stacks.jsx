@@ -145,7 +145,10 @@ export default function Stacks() {
         }
         try {
             const response = await axios.get('/api/stacks', { signal });
-            setStacks(response.data);
+            const sorted = response.data.sort((a, b) => {
+                return (a.name || '').localeCompare(b.name || '');
+            });
+            setStacks(sorted);
         } catch (error) {
             if (!axios.isCancel(error)) {
                 console.error('Failed to fetch stacks:', error);
