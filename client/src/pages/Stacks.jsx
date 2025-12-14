@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import {
     LayoutDashboard,
     Container,
@@ -170,7 +170,7 @@ export default function Stacks() {
 
     const handleCreateStack = async () => {
         if (!newStackName || !newStackContent) {
-            alert('请输入堆栈名称和 Compose 内容');
+            alert(t('stacks.input_required'));
             return;
         }
 
@@ -183,7 +183,7 @@ export default function Stacks() {
             });
 
             if (response.data.error) {
-                alert('创建失败: ' + response.data.error);
+                alert(t('stacks.create_fail') + ': ' + response.data.error);
                 return;
             }
 
@@ -199,13 +199,14 @@ export default function Stacks() {
             fetchStacks();
             fetchTemplates();
         } catch (error) {
-            alert('创建失败: ' + (error.response?.data?.error || error.message));
+
+            alert(t('stacks.create_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
     const handleCreateTemplate = async () => {
         if (!newTemplateName || !newTemplateContent) {
-            alert('请输入模板名称和 Compose 内容');
+            alert(t('stacks.input_required'));
             return;
         }
 
@@ -215,7 +216,7 @@ export default function Stacks() {
                 title: newTemplateName,
                 description: newTemplateDescription,
                 category: 'Custom',
-                category: 'Custom',
+
                 composeContent: newTemplateContent,
                 env: newTemplateEnv.map(e => ({ name: e.name, default: e.value, label: e.name }))
             });
@@ -226,13 +227,14 @@ export default function Stacks() {
             setNewTemplateEnv([]);
             await fetchTemplates();
         } catch (error) {
-            alert('创建模板失败: ' + (error.response?.data?.error || error.message));
+
+            alert(t('stacks.create_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
     const handleDeployFromTemplate = async (stackName, env) => {
         if (!stackName) {
-            alert('请输入堆栈名称');
+            alert(t('stacks.input_name_required'));
             return;
         }
 
@@ -251,7 +253,8 @@ export default function Stacks() {
             setActiveTab('stacks');
             fetchStacks();
         } catch (error) {
-            alert('部署失败: ' + (error.response?.data?.error || error.message));
+
+            alert(t('stacks.deploy_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -266,10 +269,10 @@ export default function Stacks() {
                 setNewTemplateContent(stack.composeContent);
                 setShowCreateTemplateModal(true);
             } else {
-                alert('无法获取堆栈 Compose 内容 (可能是外部堆栈)');
+                alert(t('stacks.get_content_fail'));
             }
         } catch (error) {
-            alert('获取堆栈详情失败: ' + error.message);
+            alert(t('stacks.get_detail_fail') + ': ' + error.message);
         }
     };
 
@@ -278,7 +281,8 @@ export default function Stacks() {
             await axios.post(`/api/stacks/${name}/start`);
             fetchStacks();
         } catch (error) {
-            alert('启动失败: ' + (error.response?.data?.error || error.message));
+
+            alert(t('stacks.start_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -287,7 +291,8 @@ export default function Stacks() {
             await axios.post(`/api/stacks/${name}/stop`);
             fetchStacks();
         } catch (error) {
-            alert('停止失败: ' + (error.response?.data?.error || error.message));
+
+            alert(t('stacks.stop_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -296,7 +301,8 @@ export default function Stacks() {
             await axios.post(`/api/stacks/${name}/restart`);
             fetchStacks();
         } catch (error) {
-            alert('重启失败: ' + (error.response?.data?.error || error.message));
+
+            alert(t('stacks.restart_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -314,18 +320,18 @@ export default function Stacks() {
             setDeleteStackModal({ show: false, stackName: '' });
             fetchStacks();
         } catch (error) {
-            alert('删除失败: ' + (error.response?.data?.error || error.message));
+            alert(t('stacks.delete_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
     const handleDeleteTemplate = async (name) => {
-        if (!confirm(`确定要删除模板 "${name}" 吗？`)) return;
+        if (!confirm(t('stacks.delete_template_confirm', { name }))) return;
 
         try {
             await axios.delete(`/api/stacks/templates/${name}`);
             fetchTemplates();
         } catch (error) {
-            alert('删除失败: ' + (error.response?.data?.error || error.message));
+            alert(t('stacks.delete_fail_msg') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -340,13 +346,14 @@ export default function Stacks() {
             setEditTemplateEnv((response.data.env || []).map(e => ({ name: e.name, value: e.default || e.value || '' })));
             setShowEditTemplateModal(true);
         } catch (error) {
-            alert('获取模板详情失败: ' + (error.response?.data?.error || error.message));
+
+            alert(t('stacks.get_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
     const handleSaveEditTemplate = async () => {
         if (!editTemplateName || !editTemplateContent) {
-            alert('请输入模板名称和 Compose 内容');
+            alert(t('stacks.input_required'));
             return;
         }
 
@@ -364,7 +371,7 @@ export default function Stacks() {
             setEditTemplateContent('');
             await fetchTemplates();
         } catch (error) {
-            alert('保存失败: ' + (error.response?.data?.error || error.message));
+            alert(t('stacks.save_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -383,7 +390,8 @@ export default function Stacks() {
             setSelectedExternalStack(stackName);
             setShowAddComposeModal(true);
         } catch (error) {
-            alert('获取配置失败: ' + (error.response?.data?.error || error.message));
+
+            alert(t('stacks.get_fail') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -398,7 +406,7 @@ export default function Stacks() {
             setSelectedExternalStack('');
             await fetchStacks(); // 刷新列表
         } catch (error) {
-            alert('保存失败: ' + (error.response?.data?.error || error.message));
+            alert(t('stacks.save_fail_msg') + ': ' + (error.response?.data?.error || error.message));
         }
     };
 
@@ -424,10 +432,10 @@ export default function Stacks() {
 
     const getStatusText = (status) => {
         switch (status) {
-            case 'running': return '运行中';
-            case 'stopped': return '已停止';
-            case 'partial': return '部分运行';
-            default: return '未知';
+            case 'running': return t('stacks.status_running');
+            case 'stopped': return t('stacks.status_stopped');
+            case 'partial': return t('stacks.status_partial');
+            default: return t('stacks.status_unknown');
         }
     };
 
@@ -440,15 +448,15 @@ export default function Stacks() {
                             <img src="/logo.png" alt="DMA Logo" className="w-full h-full object-contain" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h1 className={`text-base font-bold leading-tight mb-1 ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
-                                Docker Manager
-                            </h1>
-                            <div className="flex items-center justify-between">
-                                <p className={`text-sm leading-tight whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    容器化应用管理平台
-                                </p>
+                            <div className="flex items-center justify-between mb-1">
+                                <h1 className={`text-base font-bold leading-tight ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
+                                    Docker Manager
+                                </h1>
                                 <span className={`text-xs font-mono ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{APP_VERSION}</span>
                             </div>
+                            <p className={`text-sm leading-tight ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {t('app.description')}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -470,7 +478,7 @@ export default function Stacks() {
                         className={`w-full ${isDark ? 'glass glass-hover' : 'bg-red-50 hover:bg-red-100'} p-3 rounded-lg flex items-center gap-2 text-red-400 transition-colors`}
                     >
                         <LogOut className="w-5 h-5" />
-                        退出
+                        {t('auth.logout')}
                     </button>
                 </div>
             </aside>
@@ -483,8 +491,8 @@ export default function Stacks() {
                         </h1>
                         <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                             {activeTab === 'stacks'
-                                ? `共 ${stacks.length} 个堆栈`
-                                : `共 ${templates.length} 个模板`
+                                ? t('stacks.total_stacks', { count: stacks.length })
+                                : t('stacks.total_templates', { count: templates.length })
                             }
                         </p>
                     </div>
@@ -496,10 +504,10 @@ export default function Stacks() {
                                 ? 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
                                 : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'
                                 }`}
-                            title={activeTab === 'stacks' ? '创建堆栈' : '创建模板'}
+                            title={activeTab === 'stacks' ? t('stacks.create_stack_title') : t('stacks.create_template_title')}
                         >
                             <Plus className="w-5 h-5" />
-                            <span>{activeTab === 'stacks' ? '创建堆栈' : '创建模板'}</span>
+                            <span>{activeTab === 'stacks' ? t('stacks.create_stack') : t('stacks.create_template')}</span>
                         </button>
                         <button
                             onClick={toggleLanguage}
@@ -530,7 +538,7 @@ export default function Stacks() {
                     >
                         <div className="flex items-center gap-2">
                             <Boxes className="w-5 h-5" />
-                            <span>已部署堆栈</span>
+                            <span>{t('stacks.deployed_stacks')}</span>
                         </div>
                     </button>
                     <button
@@ -546,7 +554,7 @@ export default function Stacks() {
                     >
                         <div className="flex items-center gap-2">
                             <FileText className="w-5 h-5" />
-                            <span>模板库</span>
+                            <span>{t('stacks.templates_lib')}</span>
                         </div>
                     </button>
                 </div>
@@ -693,6 +701,7 @@ export default function Stacks() {
 }
 
 function StacksGrid({ stacks, loading, isDark, onStart, onStop, onRestart, onRebuild, onDelete, onAddConfig, onEditConfig, getStatusColor, getStatusText, onSaveAsTemplate }) {
+    const { t } = useTranslation();
     if (loading) {
         return null;
     }
@@ -701,9 +710,9 @@ function StacksGrid({ stacks, loading, isDark, onStart, onStop, onRestart, onReb
         return (
             <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-xl p-12 border text-center`}>
                 <Boxes className={`w-16 h-16 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-                <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>还没有部署的堆栈</h3>
+                <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('stacks.no_stacks')}</h3>
                 <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    点击"创建堆栈"按钮开始部署，或从"模板库"选择模板快速部署
+                    {t('stacks.no_stacks_desc')}
                 </p>
             </div>
         );
@@ -733,6 +742,7 @@ function StacksGrid({ stacks, loading, isDark, onStart, onStop, onRestart, onReb
 }
 
 function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDelete, onAddConfig, onEditConfig, getStatusColor, getStatusText, onSaveAsTemplate }) {
+    const { t } = useTranslation();
     const isExternal = stack.managed === false;
 
     return (
@@ -753,10 +763,10 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
                         {isExternal && (
                             <div className="group relative">
                                 <span className={`cursor-help px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-800'}`}>
-                                    外部
+                                    {t('stacks.external')}
                                 </span>
                                 <div className={`absolute left-0 bottom-full mb-2 w-48 p-2 rounded text-xs z-10 hidden group-hover:block ${isDark ? 'bg-gray-800 text-gray-200' : 'bg-gray-900 text-white'}`}>
-                                    此堆栈在外部创建。功能受限，直到您添加配置文件。
+                                    {t('stacks.external_tooltip')}
                                 </div>
                             </div>
                         )}
@@ -768,7 +778,7 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
                     </div>
 
                     <div className={`flex items-center gap-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        <span>服务: {stack.services}</span>
+                        <span>{t('stacks.services')}: {stack.services}</span>
                         {stack.serviceNames && stack.serviceNames.length > 0 && (
                             <>
                                 <span className="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
@@ -811,10 +821,10 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
                                     ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20'
                                     : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
                                     }`}
-                                title="添加配置文件以启用完整管理功能"
+                                title={t('stacks.add_config_tooltip')}
                             >
                                 <FilePlus className="w-4 h-4" />
-                                <span className="text-sm font-medium">接管堆栈</span>
+                                <span className="text-sm font-medium">{t('stacks.take_over_stack')}</span>
                             </button>
                         </div>
                     ) : (
@@ -826,7 +836,7 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
                                     ? 'hover:bg-cyan-500/10 text-cyan-400 hover:text-cyan-300'
                                     : 'hover:bg-cyan-50 text-cyan-600 hover:text-cyan-700'
                                     }`}
-                                title="编辑配置"
+                                title={t('stacks.edit_config')}
                             >
                                 <FileText className="w-5 h-5" />
                             </button>
@@ -836,7 +846,7 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
                                     ? 'hover:bg-purple-500/10 text-purple-400 hover:text-purple-300'
                                     : 'hover:bg-purple-50 text-purple-600 hover:text-purple-700'
                                     }`}
-                                title="重建"
+                                title={t('stacks.rebuild')}
                             >
                                 <Hammer className="w-5 h-5" />
                             </button>
@@ -846,7 +856,7 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
                                     ? 'hover:bg-green-500/10 text-green-400 hover:text-green-300'
                                     : 'hover:bg-green-50 text-green-600 hover:text-green-700'
                                     }`}
-                                title="启动"
+                                title={t('stacks.start')}
                             >
                                 <Play className="w-5 h-5" />
                             </button>
@@ -856,7 +866,7 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
                                     ? 'hover:bg-yellow-500/10 text-yellow-400 hover:text-yellow-300'
                                     : 'hover:bg-yellow-50 text-yellow-600 hover:text-yellow-700'
                                     }`}
-                                title="停止"
+                                title={t('stacks.stop')}
                             >
                                 <Square className="w-5 h-5" />
                             </button>
@@ -866,7 +876,7 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
                                     ? 'hover:bg-blue-500/10 text-blue-400 hover:text-blue-300'
                                     : 'hover:bg-blue-50 text-blue-600 hover:text-blue-700'
                                     }`}
-                                title="重启"
+                                title={t('stacks.restart')}
                             >
                                 <RefreshCw className="w-5 h-5" />
                             </button>
@@ -876,7 +886,7 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
                                     ? 'hover:bg-red-500/10 text-red-400 hover:text-red-300'
                                     : 'hover:bg-red-50 text-red-600 hover:text-red-700'
                                     }`}
-                                title="删除"
+                                title={t('stacks.delete')}
                             >
                                 <Trash2 className="w-5 h-5" />
                             </button>
@@ -889,13 +899,14 @@ function StackCard({ stack, isDark, onStart, onStop, onRestart, onRebuild, onDel
 }
 
 function TemplatesGrid({ templates, isDark, onDeploy, onEdit, onDelete }) {
+    const { t } = useTranslation();
     if (templates.length === 0) {
         return (
             <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-xl p-12 border text-center`}>
                 <FileText className={`w-16 h-16 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-                <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>还没有自定义模板</h3>
+                <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('stacks.no_custom_templates')}</h3>
                 <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    点击"创建模板"按钮保存您的 Compose 配置为可复用模板
+                    {t('stacks.create_template_guide')}
                 </p>
             </div>
         );
@@ -918,6 +929,7 @@ function TemplatesGrid({ templates, isDark, onDeploy, onEdit, onDelete }) {
 }
 
 function TemplateCard({ template, isDark, onDeploy, onEdit, onDelete }) {
+    const { t } = useTranslation();
     return (
         <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-xl p-4 border transition-all hover:shadow-md`}>
             <div className="flex items-center justify-between gap-4">
@@ -938,7 +950,7 @@ function TemplateCard({ template, isDark, onDeploy, onEdit, onDelete }) {
                     </div>
 
                     <div className={`flex items-center gap-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                        <span className="truncate">{template.description || '暂无描述'}</span>
+                        <span className="truncate">{template.description || t('stacks.no_description')}</span>
                         {template.tags && template.tags.length > 0 && (
                             <>
                                 <span className="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
@@ -964,7 +976,7 @@ function TemplateCard({ template, isDark, onDeploy, onEdit, onDelete }) {
                             ? 'hover:bg-cyan-500/10 text-cyan-400 hover:text-cyan-300'
                             : 'hover:bg-cyan-50 text-cyan-600 hover:text-cyan-700'
                             }`}
-                        title="部署模板"
+                        title={t('stacks.deploy_template')}
                     >
                         <Play className="w-5 h-5" />
                     </button>
@@ -974,7 +986,7 @@ function TemplateCard({ template, isDark, onDeploy, onEdit, onDelete }) {
                             ? 'hover:bg-blue-500/10 text-blue-400 hover:text-blue-300'
                             : 'hover:bg-blue-50 text-blue-600 hover:text-blue-700'
                             }`}
-                        title="编辑模板"
+                        title={t('stacks.edit_template')}
                     >
                         <Edit className="w-5 h-5" />
                     </button>
@@ -984,7 +996,7 @@ function TemplateCard({ template, isDark, onDeploy, onEdit, onDelete }) {
                             ? 'hover:bg-red-500/10 text-red-400 hover:text-red-300'
                             : 'hover:bg-red-50 text-red-600 hover:text-red-700'
                             }`}
-                        title="删除模板"
+                        title={t('stacks.delete_template')}
                     >
                         <Trash2 className="w-5 h-5" />
                     </button>
@@ -1008,45 +1020,131 @@ function extractVariablesFromCompose(content) {
     return Array.from(vars);
 }
 
-function CreateTemplateModal({ isDark, newTemplateName, setNewTemplateName, newTemplateDescription, setNewTemplateDescription, newTemplateContent, setNewTemplateContent, composeError, onCreate, onClose }) {
+
+function CreateStackModal({ isDark, newStackName, setNewStackName, newStackDescription, setNewStackDescription, newStackContent, setNewStackContent, newStackEnv, setNewStackEnv, composeError, onCreate, onClose }) {
+    const { t } = useTranslation();
     const hasError = Boolean(composeError);
-    const hasContent = newTemplateContent && newTemplateContent.trim() !== '';
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-4xl border shadow-2xl p-6 h-[85vh] overflow-y-auto`}>
-                <h2 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>创建模板</h2>
+                <h2 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('stacks.create_stack_title')}</h2>
 
                 <div className="space-y-4">
                     <div>
                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            模板名称 *
+                            {t('stacks.stack_name')} *
                         </label>
                         <input
                             type="text"
-                            value={newTemplateName}
-                            onChange={(e) => setNewTemplateName(e.target.value)}
-                            placeholder="my-template"
+                            value={newStackName}
+                            onChange={(e) => setNewStackName(e.target.value)}
+                            placeholder={t('stacks.stack_name_placeholder')}
                             className={`w-full px-4 py-2 rounded-lg border ${isDark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`}
                         />
                     </div>
 
                     <div>
                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            描述（可选）
+                            {t('stacks.description_optional')}
                         </label>
                         <input
                             type="text"
-                            value={newTemplateDescription}
-                            onChange={(e) => setNewTemplateDescription(e.target.value)}
-                            placeholder="模板描述"
+                            value={newStackDescription}
+                            onChange={(e) => setNewStackDescription(e.target.value)}
+                            placeholder={t('stacks.stack_desc_placeholder')}
                             className={`w-full px-4 py-2 rounded-lg ${isDark ? 'bg-white/10 border border-white/20 text-white placeholder-gray-500' : 'bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-400'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                         />
                     </div>
 
                     <div>
                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Docker Compose (YAML) *
+                            {t('stacks.compose_yaml')} *
+                        </label>
+                        <ComposeEditor
+                            value={newStackContent}
+                            onChange={(e) => setNewStackContent(e.target.value)}
+                            error={composeError}
+                            isDark={isDark}
+                            placeholder={`version: '3.8'\nservices: \n  app: \n    image: nginx:latest`}
+                            rows={15}
+                        />
+                    </div>
+
+                    <div>
+                        <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {t('stacks.env_config')}
+                        </label>
+                        <EnvironmentVariables
+                            value={newStackEnv}
+                            onChange={setNewStackEnv}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                    <button
+                        onClick={onClose}
+                        className={`px-4 py-2 rounded-lg ${isDark ? 'text-gray-300 hover:bg-white/10' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                        {t('common.cancel')}
+                    </button>
+                    <button
+                        onClick={onCreate}
+                        disabled={!newStackName || !newStackContent || hasError}
+                        className={`px-4 py-2 rounded-lg transition-all ${!newStackName || !newStackContent || hasError
+                            ? 'bg-gray-400 cursor-not-allowed opacity-50'
+                            : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600'
+                            }`}
+                    >
+                        {t('stacks.create_stack')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CreateTemplateModal({ isDark, newTemplateName, setNewTemplateName, newTemplateDescription, setNewTemplateDescription, newTemplateContent, setNewTemplateContent, composeError, onCreate, onClose }) {
+    const { t } = useTranslation();
+    const hasError = Boolean(composeError);
+    const hasContent = newTemplateContent && newTemplateContent.trim() !== '';
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-4xl border shadow-2xl p-6 h-[85vh] overflow-y-auto`}>
+                <h2 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('stacks.create_template_title')}</h2>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {t('stacks.template_name')} *
+                        </label>
+                        <input
+                            type="text"
+                            value={newTemplateName}
+                            onChange={(e) => setNewTemplateName(e.target.value)}
+                            placeholder={t('stacks.template_name_placeholder')}
+                            className={`w-full px-4 py-2 rounded-lg border ${isDark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`}
+                        />
+                    </div>
+
+                    <div>
+                        <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {t('stacks.description_optional')}
+                        </label>
+                        <input
+                            type="text"
+                            value={newTemplateDescription}
+                            onChange={(e) => setNewTemplateDescription(e.target.value)}
+                            placeholder={t('stacks.template_desc_placeholder')}
+                            className={`w-full px-4 py-2 rounded-lg ${isDark ? 'bg-white/10 border border-white/20 text-white placeholder-gray-500' : 'bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-400'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                        />
+                    </div>
+
+                    <div>
+                        <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {t('stacks.compose_yaml')} *
                         </label>
                         <ComposeEditor
                             value={newTemplateContent}
@@ -1064,7 +1162,7 @@ function CreateTemplateModal({ isDark, newTemplateName, setNewTemplateName, newT
                         onClick={onClose}
                         className={`px-4 py-2 rounded-lg ${isDark ? 'text-gray-300 hover:bg-white/10' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
-                        取消
+                        {t('common.cancel')}
                     </button>
                     <button
                         onClick={onCreate}
@@ -1074,7 +1172,7 @@ function CreateTemplateModal({ isDark, newTemplateName, setNewTemplateName, newT
                             : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600'
                             }`}
                     >
-                        保存模板
+                        {t('stacks.save_template')}
                     </button>
                 </div>
             </div>
@@ -1083,18 +1181,19 @@ function CreateTemplateModal({ isDark, newTemplateName, setNewTemplateName, newT
 }
 
 function EditTemplateModal({ isDark, editTemplateName, setEditTemplateName, editTemplateDescription, setEditTemplateDescription, editTemplateContent, setEditTemplateContent, composeError, onSave, onClose }) {
+    const { t } = useTranslation();
     const hasError = Boolean(composeError);
     const hasContent = editTemplateContent && editTemplateContent.trim() !== '';
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-4xl border shadow-2xl p-6 h-[85vh] overflow-y-auto`}>
-                <h2 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>编辑模板</h2>
+                <h2 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('stacks.edit_template_title')}</h2>
 
                 <div className="space-y-4">
                     <div>
                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            模板名称
+                            {t('stacks.template_name')}
                         </label>
                         <input
                             type="text"
@@ -1104,13 +1203,13 @@ function EditTemplateModal({ isDark, editTemplateName, setEditTemplateName, edit
                                 ? 'bg-white/10 border border-white/20 text-white placeholder-gray-500'
                                 : 'bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-400'
                                 } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                            placeholder="输入模板名称"
+                            placeholder={t('stacks.input_template_name')}
                         />
                     </div>
 
                     <div>
                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            描述
+                            {t('stacks.description')}
                         </label>
                         <input
                             type="text"
@@ -1120,13 +1219,13 @@ function EditTemplateModal({ isDark, editTemplateName, setEditTemplateName, edit
                                 ? 'bg-white/10 border border-white/20 text-white placeholder-gray-500'
                                 : 'bg-gray-50 border border-gray-300 text-gray-900 placeholder-gray-400'
                                 } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                            placeholder="输入模板描述"
+                            placeholder={t('stacks.input_template_desc')}
                         />
                     </div>
 
                     <div>
                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Docker Compose 内容
+                            {t('stacks.compose_content')}
                         </label>
                         <ComposeEditor
                             value={editTemplateContent}
@@ -1145,7 +1244,7 @@ function EditTemplateModal({ isDark, editTemplateName, setEditTemplateName, edit
                         className={`px-4 py-2 rounded-lg transition-colors ${isDark ? 'glass glass-hover text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                             }`}
                     >
-                        取消
+                        {t('common.cancel')}
                     </button>
                     <button
                         onClick={onSave}
@@ -1155,7 +1254,7 @@ function EditTemplateModal({ isDark, editTemplateName, setEditTemplateName, edit
                             : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600'
                             }`}
                     >
-                        保存
+                        {t('stacks.save')}
                     </button>
                 </div>
             </div>
@@ -1164,6 +1263,7 @@ function EditTemplateModal({ isDark, editTemplateName, setEditTemplateName, edit
 }
 
 function DeployModal({ isDark, template, onDeploy, onClose }) {
+    const { t } = useTranslation();
     const [stackName, setStackName] = useState('');
     // 初始化环境变量：自动从 Compose 内容中解析
     const [env, setEnv] = useState(() => {
@@ -1185,32 +1285,32 @@ function DeployModal({ isDark, template, onDeploy, onClose }) {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-4xl border shadow-2xl p-6 max-h-[90vh] overflow-y-auto`}>
                 <h2 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    从模板部署 {template.title}
+                    {t('stacks.deploy_from_template_title', { title: template.title })}
                 </h2>
 
                 <div className="space-y-4">
                     <div>
                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            新堆栈名称 *
+                            {t('stacks.new_stack_name')} *
                         </label>
                         <input
                             type="text"
                             value={stackName}
                             onChange={(e) => setStackName(e.target.value)}
-                            placeholder="my-new-stack"
+                            placeholder={t('stacks.new_stack_name_placeholder')}
                             className={`w-full px-4 py-2 rounded-lg border ${isDark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'}`}
                         />
                     </div>
 
                     <div className={`p-4 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                         <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            将使用模板 <span className="font-medium">{template.title}</span> 创建新堆栈并自动部署。
+                            <Trans i18nKey="stacks.deploy_template_desc" values={{ title: template.title }} components={{ 1: <span className="font-medium" /> }} />
                         </p>
                     </div>
 
                     <div>
                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            模板内容预览 (只读)
+                            {t('stacks.template_preview')}
                         </label>
                         <div className={`rounded-lg overflow-hidden border ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
                             <ComposeEditor
@@ -1224,7 +1324,7 @@ function DeployModal({ isDark, template, onDeploy, onClose }) {
 
                     <div>
                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            环境变量配置
+                            {t('stacks.env_config')}
                         </label>
                         {env.length > 0 ? (
                             <EnvironmentVariables
@@ -1233,7 +1333,7 @@ function DeployModal({ isDark, template, onDeploy, onClose }) {
                             />
                         ) : (
                             <div className={`text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'} italic`}>
-                                未检测到需要配置的环境变量
+                                {t('stacks.no_env_needed')}
                             </div>
                         )}
                     </div>
@@ -1244,7 +1344,7 @@ function DeployModal({ isDark, template, onDeploy, onClose }) {
                         onClick={onClose}
                         className={`px-4 py-2 rounded-lg ${isDark ? 'text-gray-300 hover:bg-white/10' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
-                        取消
+                        {t('common.cancel')}
                     </button>
                     <button
                         onClick={() => onDeploy(stackName, env)}
@@ -1254,7 +1354,7 @@ function DeployModal({ isDark, template, onDeploy, onClose }) {
                             : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600'
                             }`}
                     >
-                        部署
+                        {t('stacks.deploy')}
                     </button>
                 </div>
             </div>
@@ -1282,6 +1382,7 @@ function NavItem({ icon, label, active, onClick, isDark }) {
 }
 
 function RebuildConfirmModal({ isDark, stackName, onClose, onConfirm }) {
+    const { t } = useTranslation();
     const [alwaysPull, setAlwaysPull] = useState(false);
 
     return (
@@ -1292,12 +1393,12 @@ function RebuildConfirmModal({ isDark, stackName, onClose, onConfirm }) {
                         <Hammer className="w-5 h-5" />
                     </div>
                     <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        重建堆栈
+                        {t('stacks.rebuild_stack_title')}
                     </h2>
                 </div>
 
                 <p className={`mb-6 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    您确定要重建堆栈 <span className="font-bold">{stackName}</span> 吗？这将重新创建容器。
+                    <Trans i18nKey="stacks.rebuild_confirm_desc" values={{ name: stackName }} components={{ 1: <span className="font-bold" /> }} />
                 </p>
 
                 <div className="mb-6">
@@ -1309,11 +1410,11 @@ function RebuildConfirmModal({ isDark, stackName, onClose, onConfirm }) {
                             className="w-4 h-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
                         />
                         <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            总是拉取最新镜像 (Always pull latest image)
+                            {t('stacks.always_pull_image')}
                         </span>
                     </label>
                     <p className={`text-xs mt-1 ml-6 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                        如果选中，将在重建前强制拉取所有服务的最新镜像。
+                        {t('stacks.always_pull_desc')}
                     </p>
                 </div>
 
@@ -1322,13 +1423,13 @@ function RebuildConfirmModal({ isDark, stackName, onClose, onConfirm }) {
                         onClick={onClose}
                         className={`px-4 py-2 rounded-lg ${isDark ? 'text-gray-300 hover:bg-white/10' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
-                        取消
+                        {t('common.cancel')}
                     </button>
                     <button
                         onClick={() => onConfirm(alwaysPull)}
                         className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600"
                     >
-                        确认重建
+                        {t('stacks.confirm_rebuild')}
                     </button>
                 </div>
             </div>
@@ -1337,16 +1438,17 @@ function RebuildConfirmModal({ isDark, stackName, onClose, onConfirm }) {
 }
 
 function DeleteStackConfirmModal({ isDark, stackName, onClose, onConfirm }) {
+    const { t } = useTranslation();
     const [deleteImage, setDeleteImage] = useState(false);
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-md border shadow-2xl p-6`}>
                 <h3 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                    删除堆栈
+                    {t('stacks.delete_stack_title')}
                 </h3>
                 <p className={`mb-6 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    确定要删除堆栈 <span className="font-mono font-bold">{stackName}</span> 吗？此操作无法撤销。
+                    <Trans i18nKey="stacks.delete_stack_confirm_desc" values={{ name: stackName }} components={{ 1: <span className="font-mono font-bold" /> }} />
                 </p>
 
                 <label className={`flex items-center gap-3 p-3 rounded-lg border mb-6 cursor-pointer ${isDark ? 'border-white/10 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`}>
@@ -1358,10 +1460,10 @@ function DeleteStackConfirmModal({ isDark, stackName, onClose, onConfirm }) {
                     />
                     <div className="flex-1">
                         <div className={`font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                            同时删除镜像
+                            {t('stacks.delete_with_images')}
                         </div>
                         <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                            如果镜像被其他容器使用，删除可能会失败
+                            {t('stacks.delete_images_warn')}
                         </div>
                     </div>
                 </label>
@@ -1371,13 +1473,13 @@ function DeleteStackConfirmModal({ isDark, stackName, onClose, onConfirm }) {
                         onClick={onClose}
                         className={`px-4 py-2 rounded-lg font-medium transition-all ${isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
                     >
-                        取消
+                        {t('common.cancel')}
                     </button>
                     <button
                         onClick={() => onConfirm(deleteImage)}
                         className="px-4 py-2 rounded-lg font-medium bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-500/20"
                     >
-                        确认删除
+                        {t('stacks.confirm_delete')}
                     </button>
                 </div>
             </div>

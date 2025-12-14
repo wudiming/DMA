@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Terminal, Layout, ArrowRight, Image as ImageIcon, Plus, Trash2, CheckCircle, AlertCircle, Download, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 
 import { useEndpoint } from '../context/EndpointContext';
 
 export default function CreateContainerModal({ isDark, onClose, onSuccess, initialData }) {
     const { currentEndpoint, endpoints } = useEndpoint();
+    const { t } = useTranslation();
     const [mode, setMode] = useState('form'); // 'form' | 'command'
     const [command, setCommand] = useState('');
     const [formData, setFormData] = useState({
@@ -28,7 +30,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
     const [saveAsTemplate, setSaveAsTemplate] = useState(false);
     const [templateName, setTemplateName] = useState('');
 
-    const isEdit = !!initialData;
+    const isEdit = !!initialData && !!initialData.containerId;
 
     // Log Streaming State
     const [showLogs, setShowLogs] = useState(false);
@@ -166,7 +168,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
             setFormData(newData);
             setMode('form');
         } catch (error) {
-            alert('命令解析失败，请检查格式');
+            alert(t('container.command_parse_fail'));
         }
     };
 
@@ -319,17 +321,18 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
         isSubmitting.current = true;
 
         if (!formData.name || !formData.image) {
-            alert('请填写容器名称和镜像');
+            alert(t('container.name_image_required'));
             isSubmitting.current = false;
             return;
         }
 
         if (isEdit) {
-            if (!window.confirm('重建容器将停止并删除旧容器，是否继续？')) {
+            if (!window.confirm(t('container.rebuild_confirm'))) {
                 isSubmitting.current = false;
                 return;
             }
         }
+
 
         setLoading(true);
         setShowLogs(true);
@@ -344,17 +347,17 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
             // 只有当容器名称改变时，才在前端手动删除旧容器
             // 如果名称没变，交给后端处理（后端有重建逻辑，且能处理DMA自我更新）
             if (isEdit && initialData.name && initialData.name !== formData.name) {
-                setLogs(prev => [...prev, { type: 'step', message: '清理旧容器 (名称已变更)' }]);
+                setLogs(prev => [...prev, { type: 'step', message: t('container.cleaning_up') + ' (' + t('common.name') + ' ' + t('common.changed') + ')' }]);
                 try {
                     await axios.post(`/api/containers/${initialData.name}/stop`);
-                    setLogs(prev => [...prev, { type: 'info', message: '旧容器已停止' }]);
+                    setLogs(prev => [...prev, { type: 'info', message: t('container.container_stopped') }]);
                     await axios.delete(`/api/containers/${initialData.name}`);
-                    setLogs(prev => [...prev, { type: 'info', message: '旧容器已删除' }]);
+                    setLogs(prev => [...prev, { type: 'info', message: t('container.container_removed') }]);
                 } catch (err) {
                     if (err.response && err.response.status === 404) {
                         setLogs(prev => [...prev, { type: 'info', message: '旧容器不存在，跳过清理' }]);
                     } else {
-                        setLogs(prev => [...prev, { type: 'error', message: `清理旧容器失败: ${err.message}` }]);
+                        setLogs(prev => [...prev, { type: 'error', message: t('container.cleanup_failed') + `: ${err.message}` }]);
                     }
                 }
             }
@@ -447,7 +450,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 // Check if it was a self-update
                 if (isSelfUpdateRef.current) {
                     setStatus('success');
-                    setLogs(prev => [...prev, { type: 'success', message: '服务正在重启，连接已断开。更新成功！' }]);
+                    setLogs(prev => [...prev, { type: 'success', message: t('container.service_restarting') }]);
                 } else {
                     setStatus('error');
                     setLogs(prev => [...prev, { type: 'error', message: error.message || 'Network Error' }]);
@@ -495,9 +498,9 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
 
     const getStatusText = () => {
         switch (status) {
-            case 'deploying': return isEdit ? '重建中...' : '创建中...';
-            case 'success': return isEdit ? '重建成功' : '创建成功';
-            case 'error': return isEdit ? '重建失败' : '创建失败';
+            case 'deploying': return isEdit ? t('container.rebuilding') : t('container.creating');
+            case 'success': return isEdit ? t('container.rebuild_success') : t('container.create_success');
+            case 'error': return isEdit ? t('container.rebuild_fail') : t('container.create_fail');
             default: return '';
         }
     };
@@ -508,7 +511,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 {/* Header */}
                 <div className={`flex items-center justify-between p-6 border-b flex-shrink-0 ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
                     <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                        {isEdit ? '重建容器' : '创建容器'}
+                        {isEdit ? t('container.rebuild_title') : t('container.create_title')}
                     </h2>
 
                     <div className="flex items-center gap-3">
@@ -556,7 +559,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                     className="w-4 h-4 rounded border-gray-300 text-cyan-500 focus:ring-cyan-500"
                                 />
                                 <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                    自动滚动
+                                    {t('container.auto_scroll')}
                                 </span>
                             </label>
                             {status !== 'deploying' && (
@@ -567,7 +570,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                     }}
                                     className="px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600 transition-all text-sm font-medium shadow-lg shadow-cyan-500/20"
                                 >
-                                    完成
+                                    {t('container.finish')}
                                 </button>
                             )}
                         </div>
@@ -585,7 +588,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                     }`}
                             >
                                 <Layout className="w-4 h-4" />
-                                表单模式
+                                {t('container.form_mode')}
                             </button>
                             <button
                                 onClick={() => setMode('command')}
@@ -595,7 +598,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                     }`}
                             >
                                 <Terminal className="w-4 h-4" />
-                                命令模式
+                                {t('container.command_mode')}
                             </button>
                         </div>
 
@@ -605,7 +608,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                 <div className="p-6 space-y-4">
                                     <div className={`p-4 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
                                         <p className={`text-sm mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                            粘贴完整的 docker run 命令，我们将自动解析并填入表单。
+                                            {t('container.command_placeholder')}
                                         </p>
                                         <textarea
                                             value={command}
@@ -621,7 +624,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                             className="px-6 py-2 rounded-lg font-medium bg-cyan-500 text-white hover:bg-cyan-600 disabled:opacity-50 flex items-center gap-2"
                                         >
                                             <ArrowRight className="w-4 h-4" />
-                                            解析并填入表单
+                                            {t('container.parse_command')}
                                         </button>
                                     </div>
                                 </div>
@@ -631,14 +634,14 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                     {!isEdit && (
                                         <div className={`px-4 py-3 rounded-lg border flex items-center gap-3 ${isDark ? 'bg-white/5 border-white/10' : 'bg-blue-50/50 border-blue-100'}`}>
                                             <label className={`block text-sm font-medium whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                选择用户模板
+                                                {t('container.template_select')}
                                             </label>
                                             <select
                                                 value={selectedTemplate}
                                                 onChange={handleTemplateSelect}
                                                 className={`flex-1 px-3 py-1.5 text-sm rounded-md ${isDark ? 'glass text-white' : 'bg-white border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                                             >
-                                                <option value="">-- 不使用模板 (默认) --</option>
+                                                <option value="">{t('container.no_template')}</option>
                                                 {templates.map(t => (
                                                     <option key={t.id} value={t.id}>{t.name}</option>
                                                 ))}
@@ -649,12 +652,12 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                     {/* 基本信息 */}
                                     <div className="space-y-4">
                                         <h3 className={`text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                            基本信息
+                                            {t('container.basic_info')}
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
                                                 <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    容器名称 *
+                                                    {t('container.container_name')} *
                                                 </label>
                                                 <input
                                                     type="text"
@@ -666,7 +669,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                             </div>
                                             <div>
                                                 <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    镜像 *
+                                                    {t('container.image_label')} *
                                                 </label>
                                                 <input
                                                     type="text"
@@ -683,7 +686,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                             {/* 图标 URL */}
                                             <div>
                                                 <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    图标 URL (可选)
+                                                    {t('container.icon_url')}
                                                 </label>
                                                 {!showIconInput ? (
                                                     <button
@@ -692,7 +695,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                         className={`text-sm flex items-center gap-1 ${isDark ? 'text-cyan-400' : 'text-cyan-600'} hover:underline`}
                                                     >
                                                         <Plus className="w-3 h-3" />
-                                                        添加图标
+                                                        {t('container.add_icon')}
                                                     </button>
                                                 ) : (
                                                     <div className="flex gap-3">
@@ -725,7 +728,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                             {/* Web UI 地址 */}
                                             <div>
                                                 <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    Web UI 地址 (可选)
+                                                    {t('container.webui_url')}
                                                 </label>
                                                 {!showWebUiInput ? (
                                                     <button
@@ -749,7 +752,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                         className={`text-sm flex items-center gap-1 ${isDark ? 'text-cyan-400' : 'text-cyan-600'} hover:underline`}
                                                     >
                                                         <Plus className="w-3 h-3" />
-                                                        添加 Web UI
+                                                        {t('container.add_webui')}
                                                     </button>
                                                 ) : (
                                                     <div className="flex gap-2">
@@ -784,7 +787,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
                                                 <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    端口映射
+                                                    {t('container.port_mapping')}
                                                 </label>
                                                 <button
                                                     type="button"
@@ -792,7 +795,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     className={`text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors ${isDark ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'}`}
                                                 >
                                                     <Plus className="w-3 h-3" />
-                                                    添加端口
+                                                    {t('container.add_port')}
                                                 </button>
                                             </div>
                                             <div className="space-y-2">
@@ -815,7 +818,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     </div>
                                                 ))}
                                                 {formData.ports.length === 0 && (
-                                                    <p className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>暂无端口映射</p>
+                                                    <p className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t('container.no_ports')}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -824,7 +827,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
                                                 <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    卷挂载
+                                                    {t('container.volume_mapping')}
                                                 </label>
                                                 <button
                                                     type="button"
@@ -832,7 +835,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     className={`text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors ${isDark ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'}`}
                                                 >
                                                     <Plus className="w-3 h-3" />
-                                                    添加卷
+                                                    {t('container.add_volume')}
                                                 </button>
                                             </div>
                                             <div className="space-y-2">
@@ -855,7 +858,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     </div>
                                                 ))}
                                                 {formData.volumes.length === 0 && (
-                                                    <p className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>暂无卷挂载</p>
+                                                    <p className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t('container.no_volumes')}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -864,7 +867,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                         <div>
                                             <div className="flex items-center justify-between mb-2">
                                                 <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    环境变量
+                                                    {t('container.env_vars')}
                                                 </label>
                                                 <button
                                                     type="button"
@@ -872,7 +875,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     className={`text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors ${isDark ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'}`}
                                                 >
                                                     <Plus className="w-3 h-3" />
-                                                    添加变量
+                                                    {t('container.add_env')}
                                                 </button>
                                             </div>
                                             <div className="space-y-2">
@@ -895,7 +898,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     </div>
                                                 ))}
                                                 {formData.env.length === 0 && (
-                                                    <p className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>暂无环境变量</p>
+                                                    <p className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t('container.no_env')}</p>
                                                 )}
                                             </div>
                                         </div>
@@ -903,17 +906,17 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                         {/* 网络模式 */}
                                         <div>
                                             <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                网络模式
+                                                {t('container.network_mode')}
                                             </label>
                                             <select
                                                 value={formData.network}
                                                 onChange={(e) => setFormData({ ...formData, network: e.target.value })}
                                                 className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
                                             >
-                                                <option value="bridge">Bridge (默认)</option>
-                                                <option value="host">Host</option>
-                                                <option value="none">None</option>
-                                                <option value="container">Container</option>
+                                                <option value="bridge" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.network_bridge')}</option>
+                                                <option value="host" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.network_host')}</option>
+                                                <option value="none" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.network_none')}</option>
+                                                <option value="container" className={isDark ? 'bg-gray-800 text-white' : ''}>Container</option>
                                             </select>
                                         </div>
 
@@ -922,17 +925,17 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                         {/* 重启策略 */}
                                         <div>
                                             <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                重启策略
+                                                {t('container.restart_policy')}
                                             </label>
                                             <select
                                                 value={formData.restart}
                                                 onChange={(e) => setFormData({ ...formData, restart: e.target.value })}
                                                 className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
                                             >
-                                                <option value="no">不重启 (no)</option>
-                                                <option value="always">总是重启 (always)</option>
-                                                <option value="on-failure">失败时重启 (on-failure)</option>
-                                                <option value="unless-stopped">除非手动停止 (unless-stopped)</option>
+                                                <option value="no" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.restart_no')}</option>
+                                                <option value="always" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.restart_always')}</option>
+                                                <option value="on-failure" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.restart_on_failure')}</option>
+                                                <option value="unless-stopped" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('container.restart_unless_stopped')}</option>
                                             </select>
                                         </div>
                                     </div>
@@ -948,7 +951,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                     onClick={onClose}
                                     className={`flex-1 px-4 py-3 rounded-lg font-medium ${isDark ? 'glass glass-hover text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
                                 >
-                                    取消
+                                    {t('common.cancel')}
                                 </button>
                                 <button
                                     type="submit"
@@ -956,7 +959,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                     className={`flex-1 px-4 py-3 rounded-lg font-medium text-white disabled:opacity-50 ${isEdit ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600' : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'}`}
                                     disabled={loading || (mode === 'command')}
                                 >
-                                    {loading ? (isEdit ? '重建中...' : '创建中...') : (isEdit ? '重建容器' : '创建容器')}
+                                    {loading ? (isEdit ? t('container.rebuilding') : t('container.creating')) : (isEdit ? t('container.rebuild_title') : t('container.create_title'))}
                                 </button>
                             </div>
                         </div>

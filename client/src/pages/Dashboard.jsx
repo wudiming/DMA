@@ -95,15 +95,15 @@ export default function Dashboard() {
                             <img src="/logo.png" alt="DMA Logo" className="w-full h-full object-contain" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h1 className={`text-base font-bold leading-tight mb-1 ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
-                                Docker Manager
-                            </h1>
-                            <div className="flex items-center justify-between">
-                                <p className={`text-sm leading-tight whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    {t('app.name')}
-                                </p>
+                            <div className="flex items-center justify-between mb-1">
+                                <h1 className={`text-base font-bold leading-tight ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
+                                    Docker Manager
+                                </h1>
                                 <span className={`text-xs font-mono ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{APP_VERSION}</span>
                             </div>
+                            <p className={`text-sm leading-tight ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {t('app.description')}
+                            </p>
                         </div>
                     </div>
                 </div>

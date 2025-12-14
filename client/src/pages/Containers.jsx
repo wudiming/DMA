@@ -334,6 +334,7 @@ export default function Containers() {
 
       // 准备初始数据
       const initialData = {
+        containerId: container.Id,
         name: container.Name?.replace(/^\//, '') || '',
         image: container.Config?.Image || containerSummary.Image,
         // 端口处理：将 PortBindings 转换为数组
@@ -393,15 +394,15 @@ export default function Containers() {
               <img src="/logo.png" alt="DMA Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className={`text-base font-bold leading-tight mb-1 ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
-                Docker Manager
-              </h1>
-              <div className="flex items-center justify-between">
-                <p className={`text-sm leading-tight whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  容器化应用管理平台
-                </p>
+              <div className="flex items-center justify-between mb-1">
+                <h1 className={`text-base font-bold leading-tight ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
+                  Docker Manager
+                </h1>
                 <span className={`text-xs font-mono ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{APP_VERSION}</span>
               </div>
+              <p className={`text-sm leading-tight ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                {t('app.description')}
+              </p>
             </div>
           </div>
         </div>
@@ -639,6 +640,7 @@ function UnraidContainerCard({
   menuRef,
   onDeleteClick
 }) {
+  const { t } = useTranslation();
   const isRunning = container.State === 'running';
   const isPaused = container.State === 'paused';
   const isStopped = container.State === 'exited';
@@ -944,6 +946,7 @@ function UnraidContainerCard({
 }
 
 function DeleteConfirmModal({ isDark, container, onClose, onConfirm }) {
+  const { t } = useTranslation();
   const [deleteImage, setDeleteImage] = useState(false);
   const containerName = container.Names[0]?.replace(/^\//, '') || container.Id.substring(0, 12);
 

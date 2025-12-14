@@ -42,9 +42,9 @@ export default function Volumes() {
     const fetchVolumes = async () => {
         try {
             const response = await axios.get('/api/volumes');
-            const volumesData = response.data.Volumes || [];
+            const volumesData = (response.data && Array.isArray(response.data.Volumes)) ? response.data.Volumes : [];
             // 默认按名称排序
-            volumesData.sort((a, b) => a.Name.localeCompare(b.Name));
+            volumesData.sort((a, b) => (a.Name || '').localeCompare(b.Name || ''));
             setVolumes(volumesData);
         } catch (error) {
             console.error('Failed to fetch volumes:', error);
@@ -52,7 +52,7 @@ export default function Volumes() {
     };
 
     const handleRemove = async (volume) => {
-        if (!confirm(`确定要删除卷 ${volume.Name} 吗？`)) return;
+        if (!confirm(t('volume.delete_confirm', { name: volume.Name }))) return;
 
         try {
             await axios.delete(`/api/volumes/${volume.Name}`);
@@ -65,12 +65,12 @@ export default function Volumes() {
     };
 
     const handlePrune = async () => {
-        if (!confirm('确定要删除所有未使用的存储卷吗？此操作不可恢复。')) return;
+        if (!confirm(t('volume.prune_confirm'))) return;
 
         try {
             const response = await axios.post('/api/volumes/prune');
             const count = response.data.VolumesDeleted?.length || 0;
-            alert(`已清理 ${count} 个未使用卷`);
+            alert(t('volume.prune_success', { count }));
             fetchVolumes();
         } catch (error) {
             console.error('Failed to prune volumes:', error);
@@ -98,15 +98,15 @@ export default function Volumes() {
                             <img src="/logo.png" alt="DMA Logo" className="w-full h-full object-contain" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h1 className={`text-base font-bold leading-tight mb-1 ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
-                                Docker Manager
-                            </h1>
-                            <div className="flex items-center justify-between">
-                                <p className={`text-sm leading-tight whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    容器化应用管理平台
-                                </p>
+                            <div className="flex items-center justify-between mb-1">
+                                <h1 className={`text-base font-bold leading-tight ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
+                                    Docker Manager
+                                </h1>
                                 <span className={`text-xs font-mono ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{APP_VERSION}</span>
                             </div>
+                            <p className={`text-sm leading-tight ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {t('app.description')}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -129,7 +129,7 @@ export default function Volumes() {
                         className={`w-full ${isDark ? 'glass glass-hover' : 'bg-red-50 hover:bg-red-100'} p-3 rounded-lg flex items-center gap-2 text-red-400 transition-colors`}
                     >
                         <LogOut className="w-5 h-5" />
-                        退出
+                        {t('auth.logout')}
                     </button>
                 </div>
             </aside>
@@ -141,7 +141,7 @@ export default function Volumes() {
                             {t('nav.volumes')}
                         </h1>
                         <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            共 {volumes.length} 个存储卷
+                            {t('dashboard.total')} {volumes.length} {t('dashboard.volume_count')}
                         </p>
                     </div>
 
@@ -154,7 +154,7 @@ export default function Volumes() {
                                 }`}
                         >
                             <Trash2 className="w-5 h-5" />
-                            <span>清理未使用</span>
+                            <span>{t('volume.prune')}</span>
                         </button>
                         <button
                             onClick={toggleLanguage}
@@ -175,9 +175,9 @@ export default function Volumes() {
                     {volumes.length === 0 ? (
                         <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-xl p-12 border text-center`}>
                             <HardDrive className={`w-16 h-16 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-                            <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>没有存储卷</h3>
+                            <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('volume.no_volumes')}</h3>
                             <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                当前环境没有创建任何 Docker 存储卷
+                                {t('volume.no_volumes_desc')}
                             </p>
                         </div>
                     ) : (
@@ -197,7 +197,8 @@ export default function Volumes() {
 }
 
 function VolumeCard({ volume, isDark, handleRemove }) {
-    const created = volume.CreatedAt ? new Date(volume.CreatedAt).toLocaleDateString('zh-CN') : '-';
+    const { t } = useTranslation();
+    const created = volume.CreatedAt ? new Date(volume.CreatedAt).toLocaleDateString() : '-';
     const isUsed = volume.Containers && volume.Containers.length > 0;
 
     return (
@@ -219,16 +220,16 @@ function VolumeCard({ volume, isDark, handleRemove }) {
                                 </span>
                             ) : (
                                 <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${isDark ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-orange-100 text-orange-700 border border-orange-200'}`}>
-                                    未使用
+                                    {t('common.unused')}
                                 </span>
                             )}
                         </div>
                         <div className={`flex items-center gap-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                            <span className="font-mono">驱动: {volume.Driver}</span>
+                            <span className="font-mono">{t('volume.driver')}: {volume.Driver}</span>
                             <span className="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
-                            <span className="truncate max-w-md" title={volume.Mountpoint}>挂载点: {volume.Mountpoint}</span>
+                            <span className="truncate max-w-md" title={volume.Mountpoint}>{t('volume.mountpoint')}: {volume.Mountpoint}</span>
                             <span className="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
-                            <span>创建时间: {created}</span>
+                            <span>{t('common.created')}: {created}</span>
                         </div>
                     </div>
 
@@ -240,7 +241,7 @@ function VolumeCard({ volume, isDark, handleRemove }) {
                                     ? 'hover:bg-red-500/10 text-red-400 hover:text-red-300'
                                     : 'hover:bg-red-50 text-red-600 hover:text-red-700'
                                     } transition-colors`}
-                                title="删除卷"
+                                title={t('common.delete')}
                             >
                                 <Trash2 className="w-5 h-5" />
                             </button>

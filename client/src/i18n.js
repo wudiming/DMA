@@ -13,15 +13,24 @@ const resources = {
     }
 };
 
+const savedLanguage = localStorage.getItem('dma_language') || 'zh';
+
 i18n
     .use(initReactI18next)
     .init({
         resources,
-        lng: 'zh',
+        lng: savedLanguage,
         fallbackLng: 'en',
         interpolation: {
             escapeValue: false
+        },
+        react: {
+            useSuspense: false
         }
     });
+
+i18n.on('languageChanged', (lng) => {
+    localStorage.setItem('dma_language', lng);
+});
 
 export default i18n;

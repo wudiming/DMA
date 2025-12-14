@@ -76,11 +76,11 @@ export default function Endpoints() {
     const handleAdd = async () => {
         try {
             if (!newEndpoint.name) {
-                alert('请输入节点名称');
+                alert(t('endpoint.name_required_alert'));
                 return;
             }
             if (newEndpoint.type === 'agent' && (!newEndpoint.host || !newEndpoint.secret)) {
-                alert('Agent模式需要主机地址和密钥');
+                alert(t('endpoint.agent_required_alert'));
                 return;
             }
 
@@ -103,7 +103,7 @@ export default function Endpoints() {
             globalRefreshEndpoints();
         } catch (error) {
             console.error('Failed to add endpoint:', error);
-            alert('添加节点失败: ' + (error.response?.data?.error || error.message));
+            alert(t('endpoint.add_fail_alert') + (error.response?.data?.error || error.message));
         }
     };
 
@@ -117,12 +117,12 @@ export default function Endpoints() {
             globalRefreshEndpoints();
         } catch (error) {
             console.error('Failed to update endpoint:', error);
-            alert('更新节点失败');
+            alert(t('endpoint.update_fail_alert'));
         }
     };
 
     const handleRemove = async (endpoint) => {
-        if (!confirm(`确定要删除节点 ${endpoint.name} 吗？`)) return;
+        if (!confirm(t('endpoint.delete_confirm', { name: endpoint.name }))) return;
 
         try {
             await axios.delete(`/api/endpoints/${endpoint.id}`);
@@ -131,7 +131,7 @@ export default function Endpoints() {
             setActionMenuId(null);
         } catch (error) {
             console.error('Failed to remove endpoint:', error);
-            alert('删除节点失败');
+            alert(t('endpoint.remove_fail_alert'));
         }
     };
 
@@ -155,15 +155,15 @@ export default function Endpoints() {
                             <img src="/logo.png" alt="DMA Logo" className="w-full h-full object-contain" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h1 className={`text-base font-bold leading-tight mb-1 ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
-                                Docker Manager
-                            </h1>
-                            <div className="flex items-center justify-between">
-                                <p className={`text-sm leading-tight whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    容器化应用管理平台
-                                </p>
+                            <div className="flex items-center justify-between mb-1">
+                                <h1 className={`text-base font-bold leading-tight ${isDark ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent' : 'text-gray-900'}`}>
+                                    Docker Manager
+                                </h1>
                                 <span className={`text-xs font-mono ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{APP_VERSION}</span>
                             </div>
+                            <p className={`text-sm leading-tight ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {t('app.description')}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -185,7 +185,7 @@ export default function Endpoints() {
                         className={`w-full ${isDark ? 'glass glass-hover' : 'bg-red-50 hover:bg-red-100'} p-3 rounded-lg flex items-center gap-2 text-red-400 transition-colors`}
                     >
                         <LogOut className="w-5 h-5" />
-                        退出
+                        {t('auth.logout')}
                     </button>
                 </div>
             </aside>
@@ -197,7 +197,7 @@ export default function Endpoints() {
                             {t('nav.endpoints')}
                         </h1>
                         <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            共 {endpoints.length} 个节点
+                            {t('endpoint.total_count', { count: endpoints.length })}
                         </p>
                     </div>
 
@@ -210,7 +210,7 @@ export default function Endpoints() {
                                 }`}
                         >
                             <Plus className="w-5 h-5" />
-                            <span>添加节点</span>
+                            <span>{t('endpoint.add_button')}</span>
                         </button>
                         <button
                             onClick={toggleLanguage}
@@ -248,35 +248,35 @@ export default function Endpoints() {
                                         </h3>
                                         {endpoint.id === 'local' && (
                                             <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
-                                                本地
+                                                {t('endpoint.local_badge')}
                                             </span>
                                         )}
                                         {endpoint.id === currentEndpoint && (
                                             <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600'}`}>
-                                                当前
+                                                {t('endpoint.current_badge')}
                                             </span>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-4 text-sm text-gray-500">
                                         <span className="flex items-center gap-1">
                                             <Globe className="w-3 h-3" />
-                                            {endpoint.type === 'local' ? '本地Docker服务' : `${endpoint.host}:${endpoint.port}`}
+                                            {endpoint.type === 'local' ? t('endpoint.local_service') : `${endpoint.host}:${endpoint.port}`}
                                         </span>
                                         <span className={`flex items-center gap-1 ${endpoint.status === 'online' ? 'text-green-500' : endpoint.status === 'checking' ? 'text-yellow-500' : 'text-red-500'}`}>
                                             {endpoint.status === 'online' ? (
                                                 <>
                                                     <CheckCircle className="w-3 h-3" />
-                                                    已连接
+                                                    {t('endpoint.status_connected')}
                                                 </>
                                             ) : endpoint.status === 'checking' ? (
                                                 <>
                                                     <div className="w-3 h-3 rounded-full border-2 border-yellow-500 border-t-transparent animate-spin" />
-                                                    检测中...
+                                                    {t('endpoint.status_checking')}
                                                 </>
                                             ) : (
                                                 <>
                                                     <XCircle className="w-3 h-3" />
-                                                    未连接
+                                                    {t('endpoint.status_disconnected')}
                                                 </>
                                             )}
                                         </span>
@@ -313,12 +313,12 @@ export default function Endpoints() {
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className={`w-full max-w-md rounded-2xl p-6 ${isDark ? 'glass border border-white/10' : 'bg-white shadow-xl'}`}>
-                        <h2 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>添加远程Agent节点</h2>
+                        <h2 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('endpoint.add_modal_title')}</h2>
 
                         <div className="space-y-4">
                             <div>
                                 <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                    节点名称
+                                    {t('endpoint.name_label')}
                                 </label>
                                 <input
                                     type="text"
@@ -328,14 +328,14 @@ export default function Endpoints() {
                                         ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
                                         : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
                                         }`}
-                                    placeholder="例如: Production Server"
+                                    placeholder={t('endpoint.name_placeholder')}
                                 />
                             </div>
 
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="col-span-2">
                                     <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        主机地址 (Host)
+                                        {t('endpoint.host_label')}
                                     </label>
                                     <input
                                         type="text"
@@ -350,7 +350,7 @@ export default function Endpoints() {
                                 </div>
                                 <div>
                                     <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        端口
+                                        {t('endpoint.port_label')}
                                     </label>
                                     <input
                                         type="text"
@@ -367,7 +367,7 @@ export default function Endpoints() {
 
                             <div>
                                 <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                    Secret Key
+                                    {t('endpoint.secret_label')}
                                 </label>
                                 <input
                                     type="password"
@@ -377,7 +377,7 @@ export default function Endpoints() {
                                         ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
                                         : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
                                         }`}
-                                    placeholder="Agent 启动时设置的 DMA_SECRET"
+                                    placeholder={t('endpoint.secret_hint_placeholder')}
                                 />
                             </div>
                         </div>
@@ -387,13 +387,13 @@ export default function Endpoints() {
                                 onClick={() => setShowAddModal(false)}
                                 className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}
                             >
-                                取消
+                                {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleAdd}
                                 className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
                             >
-                                添加
+                                {t('common.create')}
                             </button>
                         </div>
                     </div>
@@ -404,12 +404,12 @@ export default function Endpoints() {
             {showEditModal && editingEndpoint && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className={`w-full max-w-md rounded-2xl p-6 ${isDark ? 'glass border border-white/10' : 'bg-white shadow-xl'}`}>
-                        <h2 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>编辑节点</h2>
+                        <h2 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('endpoint.edit_modal_title')}</h2>
 
                         <div className="space-y-4">
                             <div>
                                 <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                    节点名称
+                                    {t('endpoint.name_label')}
                                 </label>
                                 <input
                                     type="text"
@@ -425,7 +425,7 @@ export default function Endpoints() {
                             {editingEndpoint.id === 'local' && (
                                 <div>
                                     <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        主机IP (Host IP)
+                                        {t('endpoint.host_ip_label')}
                                     </label>
                                     <input
                                         type="text"
@@ -438,7 +438,7 @@ export default function Endpoints() {
                                         placeholder="例如: 192.168.1.100"
                                     />
                                     <p className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                                        设置后将用于容器WebUI访问链接 (默认: 127.0.0.1)
+                                        {t('endpoint.host_ip_hint')}
                                     </p>
                                 </div>
                             )}
@@ -448,7 +448,7 @@ export default function Endpoints() {
                                     <div className="grid grid-cols-3 gap-4">
                                         <div className="col-span-2">
                                             <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                主机地址 (Host)
+                                                {t('endpoint.host_label')}
                                             </label>
                                             <input
                                                 type="text"
@@ -462,7 +462,7 @@ export default function Endpoints() {
                                         </div>
                                         <div>
                                             <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                端口
+                                                {t('endpoint.port_label')}
                                             </label>
                                             <input
                                                 type="text"
@@ -478,7 +478,7 @@ export default function Endpoints() {
 
                                     <div>
                                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                            Secret Key
+                                            {t('endpoint.secret_label')}
                                         </label>
                                         <input
                                             type="password"
@@ -488,7 +488,7 @@ export default function Endpoints() {
                                                 ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
                                                 : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
                                                 }`}
-                                            placeholder="如果不修改请留空"
+                                            placeholder={t('endpoint.secret_placeholder')}
                                         />
                                     </div>
                                 </>
@@ -503,13 +503,13 @@ export default function Endpoints() {
                                 }}
                                 className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}
                             >
-                                取消
+                                {t('common.cancel')}
                             </button>
                             <button
                                 onClick={handleUpdate}
                                 className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
                             >
-                                更新
+                                {t('common.update')}
                             </button>
                         </div>
                     </div>

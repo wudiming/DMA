@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import yaml from 'js-yaml';
 import ComposeEditor from './ComposeEditor';
 import { validateCompose } from '../utils/validators';
@@ -11,6 +12,7 @@ export default function AddComposeModal({
     onSave,
     onClose
 }) {
+    const { t } = useTranslation();
     const [composeContent, setComposeContent] = useState(initialContent);
     const [description, setDescription] = useState('');
     const [error, setError] = useState(null);
@@ -75,10 +77,10 @@ export default function AddComposeModal({
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                {initialContent ? '编辑配置文件' : '接管外部堆栈'}
+                                {initialContent ? t('stacks.edit_config_title') : t('stacks.take_over_stack_title')}
                             </h2>
                             <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {initialContent ? '修改' : '为外部堆栈'} <span className={`font-semibold ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>{stackName}</span> {initialContent ? '的配置' : '添加配置以启用完整管理功能'}
+                                {initialContent ? t('stacks.edit_desc_prefix') : t('stacks.take_over_desc_prefix')} <span className={`font-semibold ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>{stackName}</span> {initialContent ? t('stacks.config_suffix') : t('stacks.add_config_suffix')}
                             </p>
                         </div>
                         <button
@@ -94,20 +96,20 @@ export default function AddComposeModal({
                 <div className="flex-1 overflow-auto p-6 space-y-4">
                     <div>
                         <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            描述 (可选)
+                            {t('stacks.description_optional')}
                         </label>
                         <input
                             type="text"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="描述这个堆栈的用途..."
+                            placeholder={t('stacks.desc_placeholder')}
                             className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                         />
                     </div>
 
                     <div>
                         <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            docker-compose.yml 内容 *
+                            {t('stacks.compose_content_label')}
                         </label>
                         <ComposeEditor
                             value={composeContent}
@@ -123,7 +125,7 @@ export default function AddComposeModal({
                         <div className={`flex items-start gap-2 p-3 rounded-lg ${isDark ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'}`}>
                             <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                             <div>
-                                <p className={`text-sm font-medium ${isDark ? 'text-red-400' : 'text-red-800'}`}>配置验证失败</p>
+                                <p className={`text-sm font-medium ${isDark ? 'text-red-400' : 'text-red-800'}`}>{t('stacks.config_validation_fail')}</p>
                                 <p className={`text-sm mt-1 ${isDark ? 'text-red-300' : 'text-red-600'}`}>{error.message}</p>
                             </div>
                         </div>
@@ -138,7 +140,7 @@ export default function AddComposeModal({
                         onClick={onClose}
                         className={`px-4 py-2 rounded-lg font-medium transition-all ${isDark ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 border border-gray-200 text-gray-700'}`}
                     >
-                        取消
+                        {t('common.cancel')}
                     </button>
                     <button
                         onClick={handleSave}
@@ -148,12 +150,12 @@ export default function AddComposeModal({
                         {saving ? (
                             <>
                                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                保存中...
+                                {t('stacks.saving')}
                             </>
                         ) : (
                             <>
                                 <FileText className="w-4 h-4" />
-                                {initialContent ? '保存配置' : '接管并保存'}
+                                {initialContent ? t('stacks.save_config') : t('stacks.take_over_save')}
                             </>
                         )}
                     </button>
