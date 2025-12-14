@@ -145,6 +145,47 @@ DMA_MODE=agent DMA_SECRET=test npm run dev
 - **后端**: Node.js + Express + dockerode + WebSocket
 - **部署**: Docker (Multi-stage build)
 
+## 🚢 自动发布和 Docker 镜像
+
+本项目已配置 GitHub Actions 自动化工作流，支持：
+- ✅ 自动构建多平台 Docker 镜像（amd64 + arm64）
+- ✅ 推送到 Docker Hub
+- ✅ 自动创建 GitHub Release 和生成 changelog
+
+### 发布新版本
+
+当您准备发布新版本时，只需创建并推送一个 git tag：
+
+```bash
+# 创建版本标签
+git tag v0.9.16
+
+# 推送到 GitHub
+git push origin v0.9.16
+```
+
+推送后，GitHub Actions 会自动：
+1. 构建多平台 Docker 镜像
+2. 推送到 Docker Hub，带有以下标签：
+   - `latest` - 最新版本
+   - `v0.9.16` - 完整版本号
+   - `0.9.16` - 不带 v 前缀的版本号
+3. 在 GitHub 上创建 Release 并自动生成更新日志
+
+### Docker Hub 镜像
+
+```bash
+# 拉取最新版本
+docker pull wudiming/dma:latest
+
+# 拉取指定版本
+docker pull wudiming/dma:v0.9.16
+```
+
+### 配置说明
+
+如果您 fork 了本项目并希望启用自动发布功能，请参阅 [GitHub Secrets 配置指南](.github/SECRETS_SETUP.md)。
+
 ## 📄 许可证
 
 MIT
