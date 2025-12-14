@@ -1,6 +1,6 @@
 {
     "name": "dma-client",
-    "version": "0.7.0",
+    "version": "0.9.16",
     "description": "Docker Manager App - Frontend",
     "type": "module",
     "scripts": {

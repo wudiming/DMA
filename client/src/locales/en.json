@@ -1,0 +1,9 @@
+{
+    "app": {
+        "name": "Docker Manager App",
+        "welcome": "Welcome to Docker Manager App"
+    },
+    "nav": {
+        "add": "Add Node"
+    }
+}

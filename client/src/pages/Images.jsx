@@ -68,7 +68,8 @@ export default function Images() {
     };
 
     const handleRemove = async (image) => {
-        if (!confirm(`确定要删除镜像 ${image.RepoTags ? image.RepoTags[0] : image.Id.substring(0, 12)} 吗？`)) return;
+        const imageName = image.RepoTags ? image.RepoTags[0] : image.Id.substring(0, 12);
+        if (!confirm(t('image.delete_confirm', { id: imageName }))) return;
 
         try {
             await axios.delete(`/api/images/${image.Id}`);
@@ -79,14 +80,14 @@ export default function Images() {
         }
     };
 
-    const handlePrune = async () => {
-        if (!confirm('确定要删除所有未使用的镜像吗？此操作不可恢复。')) return;
+    const handlePrune = async (image) => {
+        if (!confirm(t('image.prune_confirm'))) return;
 
         try {
             const response = await axios.post('/api/images/prune');
             const spaceReclaimed = response.data.SpaceReclaimed || 0;
             const spaceFormatted = (spaceReclaimed / 1024 / 1024).toFixed(2);
-            alert(`清理完成，释放空间: ${spaceFormatted} MB`);
+            alert(t('image.prune_success', { size: spaceFormatted }));
             fetchImages();
         } catch (error) {
             console.error('Failed to prune images:', error);
@@ -124,7 +125,7 @@ export default function Images() {
                             </h1>
                             <div className="flex items-center justify-between">
                                 <p className={`text-sm leading-tight whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    容器化应用管理平台
+                                    {t('app.name')}
                                 </p>
                                 <span className={`text-xs font-mono ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{APP_VERSION}</span>
                             </div>
@@ -150,7 +151,7 @@ export default function Images() {
                         className={`w-full ${isDark ? 'glass glass-hover' : 'bg-red-50 hover:bg-red-100'} p-3 rounded-lg flex items-center gap-2 text-red-400 transition-colors`}
                     >
                         <LogOut className="w-5 h-5" />
-                        退出
+                        {t('auth.logout')}
                     </button>
                 </div>
             </aside>
@@ -162,7 +163,7 @@ export default function Images() {
                             {t('nav.images')}
                         </h1>
                         <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            共 {images.length} 个镜像
+                            {t('dashboard.total')} {images.length} {t('nav.images')}
                         </p>
                     </div>
 
@@ -175,7 +176,7 @@ export default function Images() {
                                 }`}
                         >
                             <Trash2 className="w-5 h-5" />
-                            <span>清理未使用</span>
+                            <span>{t('image.prune')}</span>
                         </button>
 
                         <button
@@ -186,7 +187,7 @@ export default function Images() {
                                 }`}
                         >
                             <Download className="w-5 h-5" />
-                            <span>拉取镜像</span>
+                            <span>{t('image.pull')}</span>
                         </button>
 
                         <button
@@ -208,9 +209,9 @@ export default function Images() {
                     {images.length === 0 ? (
                         <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-xl p-12 border text-center`}>
                             <ImageIcon className={`w-16 h-16 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-                            <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>没有镜像</h3>
+                            <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('image.no_images')}</h3>
                             <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                当前环境没有下载任何 Docker 镜像。点击右上角"拉取镜像"开始。
+                                {t('image.no_images_desc')}
                             </p>
                         </div>
                     ) : (
@@ -248,7 +249,7 @@ export default function Images() {
                     onSuccess={() => {
                         setShowCreateModal(false);
                         setSelectedImage(null);
-                        if (confirm('容器创建成功，是否前往容器列表查看？')) {
+                        if (confirm(t('container.create_success_confirm'))) {
                             navigate('/containers');
                         }
                     }}
@@ -292,7 +293,7 @@ function ImageCard({ image, isDark, handleRemove, onRun }) {
                                 </span>
                             ) : (
                                 <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${isDark ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'bg-orange-100 text-orange-700 border border-orange-200'}`}>
-                                    未使用
+                                    {t('common.unused')}
                                 </span>
                             )}
                         </div>
@@ -322,7 +323,7 @@ function ImageCard({ image, isDark, handleRemove, onRun }) {
                                 ? 'hover:bg-green-500/10 text-green-400 hover:text-green-300'
                                 : 'hover:bg-green-50 text-green-600 hover:text-green-700'
                                 } transition-colors`}
-                            title="创建容器"
+                            title={t('container.create')}
                         >
                             <Play className="w-5 h-5" />
                         </button>
@@ -334,7 +335,7 @@ function ImageCard({ image, isDark, handleRemove, onRun }) {
                                     ? 'hover:bg-red-500/10 text-red-400 hover:text-red-300'
                                     : 'hover:bg-red-50 text-red-600 hover:text-red-700'
                                     } transition-colors`}
-                                title="删除镜像"
+                                title={t('image.delete_confirm', { id: '' }).replace('?', '')}
                             >
                                 <Trash2 className="w-5 h-5" />
                             </button>

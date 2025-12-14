@@ -1,0 +1,39 @@
+{
+    "app": {
+        "name": "Docker 管理应用",
+        "welcome": "欢迎使用 Docker Manager App"
+    },
+    "nav": {
+        "dashboard": "概览",
+        "containers": "容器",
+        "images": "镜像",
+        "stacks": "编排",
+        "volumes": "存储卷",
+        "networks": "网络",
+        "endpoints": "节点"
+    },
+    "auth": {
+        "login": "登录",
+        "username": "用户名",
+        "password": "密码",
+        "loginButton": "登录",
+        "loggingIn": "登录中...",
+        "loginFailed": "登录失败",
+        "logout": "退出"
+    },
+    "common": {
+        "confirm": "确定",
+        "cancel": "取消",
+        "delete": "删除",
+        "edit": "编辑",
+        "remove": "移除",
+        "search": "搜索",
+        "create": "创建",
+        "update": "更新",
+        "actions": "操作",
+        "status": "状态",
+        "name": "名称",
+        "id": "ID",
+        "add": "添加节点"
+    }
+}

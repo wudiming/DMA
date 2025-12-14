@@ -100,7 +100,7 @@ export default function Dashboard() {
                             </h1>
                             <div className="flex items-center justify-between">
                                 <p className={`text-sm leading-tight whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    容器化应用管理平台
+                                    {t('app.name')}
                                 </p>
                                 <span className={`text-xs font-mono ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{APP_VERSION}</span>
                             </div>
@@ -122,7 +122,7 @@ export default function Dashboard() {
                     <EndpointSelector isDark={isDark} popupDirection="up" />
                     <button onClick={handleLogout} className={`w-full ${isDark ? 'glass glass-hover' : 'bg-red-50 hover:bg-red-100'} p-3 rounded-lg flex items-center gap-2 text-red-400 transition-colors`}>
                         <LogOut className="w-5 h-5" />
-                        退出
+                        {t('auth.logout')}
                     </button>
                 </div>
             </aside>
@@ -133,7 +133,7 @@ export default function Dashboard() {
                     <div>
                         <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('nav.dashboard')}</h1>
                         <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            系统概览 {dataSource === 'aggregated' ? '· 远程节点' : ''}
+                            {t('dashboard.system_overview')} {dataSource === 'aggregated' ? `· ${t('dashboard.remote_node')}` : ''}
                         </p>
                     </div>
                     <div className="flex gap-3">
@@ -152,18 +152,18 @@ export default function Dashboard() {
                     <div className={`col-span-3 ${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-lg p-5 border`}>
                         <div className="flex items-center gap-2 mb-3">
                             <Info className={`w-4 h-4 ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`} />
-                            <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>基础信息</h2>
+                            <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('dashboard.basic_info')}</h2>
                         </div>
                         {
                             systemInfo && (
                                 <div className="space-y-1.5 text-xs">
-                                    <InfoRow label="节点信息" value={currentEndpointData?.name || '本地Docker'} isDark={isDark} />
-                                    <InfoRow label="Docker版本" value={`${systemInfo.ServerVersion}`} isDark={isDark} />
-                                    <InfoRow label="系统信息" value={systemInfo.OperatingSystem} isDark={isDark} />
-                                    <InfoRow label="系统架构" value={systemInfo.Architecture} isDark={isDark} />
-                                    <InfoRow label="Cpu / Mem" value={`${systemInfo.NCPU} 核 / ${(systemInfo.MemTotal / 1024 / 1024 / 1024).toFixed(2)} GB`} isDark={isDark} />
-                                    <InfoRow label="存储驱动" value={systemInfo.Driver} isDark={isDark} />
-                                    <InfoRow label="网络插件" value={systemInfo.Plugins?.Network ? systemInfo.Plugins.Network.join(', ') : 'N/A'} isDark={isDark} />
+                                    <InfoRow label={t('dashboard.node_info')} value={currentEndpointData?.name || t('endpoint.local')} isDark={isDark} />
+                                    <InfoRow label={t('dashboard.docker_version')} value={`${systemInfo.ServerVersion}`} isDark={isDark} />
+                                    <InfoRow label={t('dashboard.os_info')} value={systemInfo.OperatingSystem} isDark={isDark} />
+                                    <InfoRow label={t('dashboard.arch')} value={systemInfo.Architecture} isDark={isDark} />
+                                    <InfoRow label="Cpu / Mem" value={`${systemInfo.NCPU} Core / ${(systemInfo.MemTotal / 1024 / 1024 / 1024).toFixed(2)} GB`} isDark={isDark} />
+                                    <InfoRow label={t('dashboard.storage_driver')} value={systemInfo.Driver} isDark={isDark} />
+                                    <InfoRow label={t('dashboard.network_plugins')} value={systemInfo.Plugins?.Network ? systemInfo.Plugins.Network.join(', ') : 'N/A'} isDark={isDark} />
                                 </div>
                             )
                         }
@@ -175,7 +175,7 @@ export default function Dashboard() {
                         <div className="flex-1 flex flex-col">
                             <div className="flex items-center gap-2 mb-2">
                                 <Cpu className={`w-4 h-4 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-                                <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>CPU</h2>
+                                <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('container.cpu')}</h2>
                             </div>
                             {
                                 usage && (
@@ -188,7 +188,7 @@ export default function Dashboard() {
                                         />
                                         <div className="mt-2 text-center">
                                             <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                                                {usage.cpu.cores} 核
+                                                {usage.cpu.cores} Core
                                             </div>
                                         </div>
                                     </div>
@@ -203,7 +203,7 @@ export default function Dashboard() {
                         <div className="flex-1 flex flex-col">
                             <div className="flex items-center gap-2 mb-2">
                                 <MemoryStick className={`w-4 h-4 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
-                                <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>内存</h2>
+                                <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('container.memory')}</h2>
                             </div>
                             {
                                 usage && (
@@ -231,7 +231,7 @@ export default function Dashboard() {
                         <div className="flex-1 flex flex-col">
                             <div className="flex items-center gap-2 mb-3">
                                 <HardDriveIcon className={`w-4 h-4 ${isDark ? 'text-orange-400' : 'text-orange-600'}`} />
-                                <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>磁盘</h2>
+                                <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('dashboard.disk_usage')}</h2>
                             </div>
                             {
                                 disk && (
@@ -239,22 +239,22 @@ export default function Dashboard() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <ArrowUp className="w-3.5 h-3.5 text-blue-400" />
-                                                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>写入</span>
+                                                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{t('dashboard.write')}</span>
                                             </div>
                                             <span className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>0 B/s</span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <ArrowDown className="w-3.5 h-3.5 text-green-400" />
-                                                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>读取</span>
+                                                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{t('dashboard.read')}</span>
                                             </div>
                                             <span className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>0 B/s</span>
                                         </div>
                                         <div className={`pt-2 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
                                             <div className="space-y-0.5">
-                                                <InfoRow label="使用率" value={`${disk.usagePercent}%`} isDark={isDark} small />
-                                                <InfoRow label="总容量" value={disk.totalFormatted} isDark={isDark} small />
-                                                <InfoRow label="剩余" value={disk.availableFormatted} isDark={isDark} small />
+                                                <InfoRow label={t('dashboard.usage')} value={`${disk.usagePercent}%`} isDark={isDark} small />
+                                                <InfoRow label={t('dashboard.capacity')} value={disk.totalFormatted} isDark={isDark} small />
+                                                <InfoRow label={t('dashboard.available')} value={disk.availableFormatted} isDark={isDark} small />
                                             </div>
                                         </div>
                                     </div>
@@ -269,7 +269,7 @@ export default function Dashboard() {
                         <div className="flex-1 flex flex-col">
                             <div className="flex items-center gap-2 mb-3">
                                 <WifiIcon className={`w-4 h-4 ${isDark ? 'text-green-400' : 'text-green-600'}`} />
-                                <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>网络</h2>
+                                <h2 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('nav.networks')}</h2>
                             </div>
                             {
                                 network && (
@@ -277,22 +277,22 @@ export default function Dashboard() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <ArrowUp className="w-3.5 h-3.5 text-orange-400" />
-                                                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>发送</span>
+                                                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{t('dashboard.tx')}</span>
                                             </div>
                                             <span className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{network.txFormatted}</span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
-                                                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>接收</span>
+                                                <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{t('dashboard.rx')}</span>
                                             </div>
                                             <span className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{network.rxFormatted}</span>
                                         </div>
                                         <div className={`pt-2 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
                                             <div className="space-y-0.5">
-                                                <InfoRow label="使用率" value="0%" isDark={isDark} small />
-                                                <InfoRow label="总发送" value="0 GB" isDark={isDark} small />
-                                                <InfoRow label="总接收" value="0 GB" isDark={isDark} small />
+                                                <InfoRow label={t('dashboard.usage')} value="0%" isDark={isDark} small />
+                                                <InfoRow label={t('dashboard.total_tx')} value="0 GB" isDark={isDark} small />
+                                                <InfoRow label={t('dashboard.total_rx')} value="0 GB" isDark={isDark} small />
                                             </div>
                                         </div>
                                     </div>
@@ -307,13 +307,13 @@ export default function Dashboard() {
                     <div className={`col-span-9 ${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-lg p-3 border`}>
                         <div className="flex items-center gap-2 mb-3">
                             <Database className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-                            <h2 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>用量统计</h2>
+                            <h2 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('dashboard.usage_stats')}</h2>
                         </div>
 
                         <div className="flex gap-2 mb-3">
-                            <TabButton label="容器" active={activeTab === 'containers'} onClick={() => setActiveTab('containers')} isDark={isDark} />
-                            <TabButton label="镜像" active={activeTab === 'images'} onClick={() => setActiveTab('images')} isDark={isDark} />
-                            <TabButton label="存储卷" active={activeTab === 'volumes'} onClick={() => setActiveTab('volumes')} isDark={isDark} />
+                            <TabButton label={t('nav.containers')} active={activeTab === 'containers'} onClick={() => setActiveTab('containers')} isDark={isDark} />
+                            <TabButton label={t('nav.images')} active={activeTab === 'images'} onClick={() => setActiveTab('images')} isDark={isDark} />
+                            <TabButton label={t('nav.volumes')} active={activeTab === 'volumes'} onClick={() => setActiveTab('volumes')} isDark={isDark} />
                         </div>
 
                         <div className="w-full">
@@ -334,10 +334,10 @@ export default function Dashboard() {
 
                     <div className={`col-span-3 ${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-lg p-6 border`}>
                         <div className="space-y-4">
-                            <StatsCard icon={<Container className="w-5 h-5" />} title="容器" value={stats?.containers.total || 0} subtitle={`${stats?.containers.running || 0} 个运行中`} color="blue" onClick={() => navigate('/containers')} isDark={isDark} />
-                            <StatsCard icon={<Image className="w-5 h-5" />} title="镜像" value={stats?.images.total || 0} subtitle={stats?.images.sizeFormatted || '0 GB'} color="green" onClick={() => navigate('/images')} isDark={isDark} />
-                            <StatsCard icon={<HardDrive className="w-5 h-5" />} title="存储卷" value={stats?.volumes.total || 0} subtitle="个存储卷" color="purple" onClick={() => navigate('/volumes')} isDark={isDark} />
-                            <StatsCard icon={<Network className="w-5 h-5" />} title="网络" value={stats?.networks.total || 0} subtitle="个网络" color="orange" onClick={() => navigate('/networks')} isDark={isDark} />
+                            <StatsCard icon={<Container className="w-5 h-5" />} title={t('nav.containers')} value={stats?.containers.total || 0} subtitle={t('dashboard.running_count', { count: stats?.containers.running || 0 })} color="blue" onClick={() => navigate('/containers')} isDark={isDark} />
+                            <StatsCard icon={<Image className="w-5 h-5" />} title={t('nav.images')} value={stats?.images.total || 0} subtitle={stats?.images.sizeFormatted || '0 GB'} color="green" onClick={() => navigate('/images')} isDark={isDark} />
+                            <StatsCard icon={<HardDrive className="w-5 h-5" />} title={t('nav.volumes')} value={stats?.volumes.total || 0} subtitle={t('dashboard.volume_count')} color="purple" onClick={() => navigate('/volumes')} isDark={isDark} />
+                            <StatsCard icon={<Network className="w-5 h-5" />} title={t('nav.networks')} value={stats?.networks.total || 0} subtitle={t('dashboard.network_count')} color="orange" onClick={() => navigate('/networks')} isDark={isDark} />
                         </div>
                     </div>
                 </div>

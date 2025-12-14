@@ -158,18 +158,17 @@ DMA_MODE=agent DMA_SECRET=test npm run dev
 
 ```bash
 # 创建版本标签
-git tag v0.9.16
+git tag v1.0.0
 
 # 推送到 GitHub
-git push origin v0.9.16
+git push origin v1.0.0
 ```
 
 推送后，GitHub Actions 会自动：
 1. 构建多平台 Docker 镜像
 2. 推送到 Docker Hub，带有以下标签：
    - `latest` - 最新版本
-   - `v0.9.16` - 完整版本号
-   - `0.9.16` - 不带 v 前缀的版本号
+   - `v1.0.0` - 完整版本号
 3. 在 GitHub 上创建 Release 并自动生成更新日志
 
 ### Docker Hub 镜像
@@ -179,7 +178,7 @@ git push origin v0.9.16
 docker pull wudiming/dma:latest
 
 # 拉取指定版本
-docker pull wudiming/dma:v0.9.16
+docker pull wudiming/dma:v1.0.0
 ```
 
 ### 配置说明

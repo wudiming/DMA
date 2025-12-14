@@ -1,8 +1,10 @@
 import { Server, ChevronDown, Check } from 'lucide-react';
 import { useEndpoint } from '../context/EndpointContext';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function EndpointSelector({ isDark, popupDirection = 'down' }) {
+    const { t } = useTranslation();
     const { currentEndpoint, endpoints, switchEndpoint } = useEndpoint();
     const [isOpen, setIsOpen] = useState(false);
     const currentEndpointData = endpoints.find(e => e.id === currentEndpoint);
@@ -10,7 +12,7 @@ export default function EndpointSelector({ isDark, popupDirection = 'down' }) {
     return (
         <div className="mb-6">
             <div className={`text-xs font-medium mb-2 ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
-                DOCKER节点
+                {t('endpoint.title')}
             </div>
 
             <div className="relative">
@@ -24,7 +26,7 @@ export default function EndpointSelector({ isDark, popupDirection = 'down' }) {
                     <Server className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                     <div className="flex-1 min-w-0 text-left">
                         <div className={`text-sm font-medium truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                            {currentEndpointData?.name || '本地Docker'}
+                            {currentEndpointData?.name || t('endpoint.local')}
                             {currentEndpointData?.host && (
                                 <span className={`ml-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                                     {currentEndpointData.host}
@@ -37,8 +39,7 @@ export default function EndpointSelector({ isDark, popupDirection = 'down' }) {
 
                 {/* 下拉菜单 - 只显示名称 */}
                 {isOpen && (
-                    <div className={`absolute ${popupDirection === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 right-0 max-h-64 overflow-y-auto ${isDark ? 'glass border-white/20 shadow-2xl' : ' bg-white border-gray-200 shadow-xl'
-                        } border rounded-lg z-50`}>
+                    <div className={`absolute ${popupDirection === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 right-0 max-h-64 overflow-y-auto ${isDark ? 'glass-menu-dark' : 'glass-menu-light'} rounded-lg z-[100]`}>
                         {endpoints
                             .filter(endpoint => endpoint.status === 'online' || !endpoint.status || endpoint.id === currentEndpoint)
                             .map((endpoint) => (

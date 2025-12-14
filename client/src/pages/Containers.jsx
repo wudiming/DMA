@@ -436,7 +436,7 @@ export default function Containers() {
               {t('nav.containers')}
             </h1>
             <p className={`mt-1 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              共 {containers.length} 个容器
+              {t('dashboard.total')} {containers.length} {t('nav.containers')}
             </p>
           </div>
 
@@ -449,7 +449,7 @@ export default function Containers() {
                 }`}
             >
               <Plus className="w-5 h-5" />
-              <span>创建容器</span>
+              <span>{t('container.create')}</span>
             </button>
             <button
               onClick={toggleLanguage}
@@ -469,7 +469,7 @@ export default function Containers() {
         {/* 批量操作按钮 */}
         <div className={`mb-6 p-4 rounded-lg ${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} border`}>
           <h3 className={`text-sm font-medium mb-3 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-            批量管理容器
+            {t('container.batch_actions')}
           </h3>
           <div className="flex flex-wrap gap-2">
             <button
@@ -477,21 +477,21 @@ export default function Containers() {
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${isDark ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
             >
               <Play className="w-4 h-4 inline mr-1" />
-              全部启动
+              {t('container.start_all')}
             </button>
             <button
               onClick={() => handleBulkAction('stop')}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${isDark ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20' : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'}`}
             >
               <Square className="w-4 h-4 inline mr-1" />
-              全部停止
+              {t('container.stop_all')}
             </button>
             <button
               onClick={() => handleBulkAction('restart')}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${isDark ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
             >
               <RotateCw className="w-4 h-4 inline mr-1" />
-              全部重启
+              {t('container.restart_all')}
             </button>
             <button
               onClick={checkAllUpdates}
@@ -499,14 +499,14 @@ export default function Containers() {
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${isDark ? 'bg-purple-500/10 text-purple-400 hover:bg-purple-500/20' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'} disabled:opacity-50`}
             >
               {checkingAll ? <Loader2 className="w-4 h-4 inline mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 inline mr-1" />}
-              检查更新
+              {t('container.check_updates')}
             </button>
             <button
               onClick={updateAllContainers}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${isDark ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'}`}
             >
               <RefreshCw className="w-4 h-4 inline mr-1" />
-              全部更新
+              {t('container.update_all')}
             </button>
           </div>
         </div>
@@ -515,9 +515,9 @@ export default function Containers() {
           {containers.length === 0 ? (
             <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-xl p-12 border text-center`}>
               <Container className={`w-16 h-16 mx-auto mb-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
-              <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>没有容器</h3>
+              <h3 className={`text-lg font-semibold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('container.no_containers')}</h3>
               <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                当前环境没有运行任何容器。点击右上角"创建容器"开始。
+                {t('container.no_containers_desc')}
               </p>
             </div>
           ) : (
@@ -729,13 +729,13 @@ function UnraidContainerCard({
           {isMenuOpen && (
             <div
               ref={menuRef}
-              className={`absolute left-full ml-2 top-0 w-56 ${isDark ? 'glass border-white/20 shadow-2xl' : 'bg-white border-gray-200 shadow-2xl'} border rounded-lg overflow-hidden z-50 animate-in fade-in slide-in-from-left-2 duration-200`}
+              className={`absolute left-full ml-2 top-0 w-56 ${isDark ? 'glass-menu-dark' : 'glass-menu-light'} rounded-lg overflow-hidden z-[100] animate-in fade-in slide-in-from-left-2 duration-200`}
             >
               {hasWebUI && webUIUrl && (
                 <>
                   <UnraidMenuItem
                     icon={<ExternalLink className="w-4 h-4" />}
-                    label="打开网页界面"
+                    label={t('container.open_webui')}
                     onClick={() => window.open(webUIUrl, '_blank')}
                     isDark={isDark}
                   />
@@ -745,7 +745,7 @@ function UnraidContainerCard({
 
               <UnraidMenuItem
                 icon={<Terminal className="w-4 h-4" />}
-                label="控制台"
+                label={t('container.shell')}
                 onClick={() => handleShowTerminal(container)}
                 isDark={isDark}
                 disabled={!isRunning}
@@ -758,7 +758,7 @@ function UnraidContainerCard({
                   {!isRunning && !isPaused && (
                     <UnraidMenuItem
                       icon={<Play className="w-4 h-4" />}
-                      label="启动"
+                      label={t('container.start')}
                       onClick={() => handleAction(container, 'start')}
                       isDark={isDark}
                     />
@@ -766,7 +766,7 @@ function UnraidContainerCard({
                   {isRunning && (
                     <UnraidMenuItem
                       icon={<Square className="w-4 h-4" />}
-                      label="停止"
+                      label={t('container.stop')}
                       onClick={() => handleAction(container, 'stop')}
                       isDark={isDark}
                     />
@@ -774,7 +774,7 @@ function UnraidContainerCard({
                   {isRunning && (
                     <UnraidMenuItem
                       icon={<Pause className="w-4 h-4" />}
-                      label="暂停"
+                      label={t('container.pause')}
                       onClick={() => handleAction(container, 'pause')}
                       isDark={isDark}
                     />
@@ -782,14 +782,14 @@ function UnraidContainerCard({
                   {isPaused && (
                     <UnraidMenuItem
                       icon={<PlayCircle className="w-4 h-4" />}
-                      label="恢复"
+                      label={t('container.resume')}
                       onClick={() => handleAction(container, 'unpause')}
                       isDark={isDark}
                     />
                   )}
                   <UnraidMenuItem
                     icon={<RotateCw className="w-4 h-4" />}
-                    label="重新启动"
+                    label={t('container.restart')}
                     onClick={() => handleAction(container, 'restart')}
                     isDark={isDark}
                   />
@@ -800,7 +800,7 @@ function UnraidContainerCard({
 
               <UnraidMenuItem
                 icon={<FileText className="w-4 h-4" />}
-                label="日志"
+                label={t('container.logs')}
                 onClick={() => handleShowLogs(container)}
                 isDark={isDark}
               />
@@ -809,13 +809,13 @@ function UnraidContainerCard({
                 <>
                   <UnraidMenuItem
                     icon={<Edit className="w-4 h-4" />}
-                    label="编辑"
+                    label={t('common.edit')}
                     onClick={() => handleShowUpdate(container)}
                     isDark={isDark}
                   />
                   <UnraidMenuItem
                     icon={<Trash2 className="w-4 h-4" />}
-                    label="移除"
+                    label={t('common.remove')}
                     onClick={() => {
                       onDeleteClick(container);
                     }}
@@ -844,13 +844,13 @@ function UnraidContainerCard({
             {updateStatus === 'checking' && (
               <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs ${isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
                 <Loader2 className="w-3 h-3 animate-spin" />
-                <span>检查中</span>
+                <span>{t('container.checking')}</span>
               </div>
             )}
             {updateStatus === 'latest' && (
               <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs ${isDark ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-600'}`}>
                 <CheckCircle2 className="w-3 h-3" />
-                <span>最新</span>
+                <span>{t('container.up_to_date')}</span>
               </div>
             )}
             {updateStatus === 'available' && (
@@ -859,19 +859,19 @@ function UnraidContainerCard({
                 className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all ${isDark ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20' : 'bg-orange-50 text-orange-600 hover:bg-orange-100'}`}
               >
                 {isStack ? <Boxes className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
-                <span>{isStack ? '前往编排更新' : '更新'}</span>
+                <span>{isStack ? t('container.update_available') : t('common.update')}</span>
               </button>
             )}
             {updateStatus === 'updating' && (
               <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs ${isDark ? 'bg-cyan-500/10 text-cyan-400' : 'bg-cyan-50 text-cyan-600'}`}>
                 <Loader2 className="w-3 h-3 animate-spin" />
-                <span>更新中</span>
+                <span>{t('container.updating')}</span>
               </div>
             )}
             {updateStatus === 'local' && (
               <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs ${isDark ? 'bg-gray-500/10 text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                 <HardDrive className="w-3 h-3" />
-                <span>本地</span>
+                <span>{t('container.local')}</span>
               </div>
             )}
             {updateStatus === 'error' && (
@@ -897,11 +897,11 @@ function UnraidContainerCard({
             </div>
             <div className="flex items-center gap-2">
               <Network className="w-3 h-3" />
-              <span className="truncate">端口: {ports}</span>
+              <span className="truncate">{t('container.ports')}: {ports}</span>
             </div>
             <div className="flex items-center gap-2">
               <FolderOpen className="w-3 h-3" />
-              <span className="truncate">卷: {volumes}</span>
+              <span className="truncate">{t('container.volumes')}: {volumes}</span>
             </div>
           </div>
         </div>
@@ -914,7 +914,7 @@ function UnraidContainerCard({
               <div className="flex-1 text-center">
                 <div className="flex items-center justify-center gap-1 mb-1">
                   <Cpu className="w-4 h-4 text-blue-400" />
-                  <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>CPU</span>
+                  <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t('container.cpu')}</span>
                 </div>
                 <div className="text-base font-bold text-blue-400 text-center" style={{ width: '70px', display: 'inline-block' }}>
                   {stats ? `${stats.cpu.percent}%` : <ThreeDotsLoader isDark={isDark} />}
@@ -924,7 +924,7 @@ function UnraidContainerCard({
               <div className="flex-1 text-center">
                 <div className="flex items-center justify-center gap-1 mb-1">
                   <HardDriveIcon className="w-4 h-4 text-purple-400" />
-                  <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>内存</span>
+                  <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t('container.memory')}</span>
                 </div>
                 <div className="text-base font-bold text-purple-400 text-center" style={{ width: '90px', display: 'inline-block' }}>
                   {stats ? stats.memory.usageFormatted : <ThreeDotsLoader isDark={isDark} />}
@@ -951,10 +951,10 @@ function DeleteConfirmModal({ isDark, container, onClose, onConfirm }) {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-md border shadow-2xl p-6`}>
         <h3 className={`text-xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
-          删除容器
+          {t('container.delete_modal_title')}
         </h3>
         <p className={`mb-6 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-          确定要删除容器 <span className="font-mono font-bold">{containerName}</span> 吗？此操作无法撤销。
+          {t('container.delete_modal_content', { name: containerName })}
         </p>
 
         <label className={`flex items-center gap-3 p-3 rounded-lg border mb-6 cursor-pointer ${isDark ? 'border-white/10 hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`}>
@@ -966,10 +966,10 @@ function DeleteConfirmModal({ isDark, container, onClose, onConfirm }) {
           />
           <div className="flex-1">
             <div className={`font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-              同时删除镜像
+              {t('container.delete_with_image')}
             </div>
             <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              如果镜像被其他容器使用，删除可能会失败
+              {t('container.delete_with_image_desc')}
             </div>
           </div>
         </label>
@@ -979,13 +979,13 @@ function DeleteConfirmModal({ isDark, container, onClose, onConfirm }) {
             onClick={onClose}
             className={`px-4 py-2 rounded-lg font-medium transition-all ${isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             onClick={() => onConfirm(deleteImage)}
             className="px-4 py-2 rounded-lg font-medium bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-500/20"
           >
-            确认删除
+            {t('common.confirm')}
           </button>
         </div>
       </div>
