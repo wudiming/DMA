@@ -2588,7 +2588,7 @@ app.post('/api/stacks/templates/:templateName/deploy', async (req, res) => {
     };
 
     saveStackMetadata(stackName, metadata);
-    stacks.set(stackName, metadata);
+    stacks.set(stackId, metadata);
 
     // 自动部署
     if (!req.body.skipDeploy) {
