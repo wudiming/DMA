@@ -801,9 +801,6 @@ app.post('/api/containers/create', async (req, res) => {
       } catch (err) {
         shouldPull = true;
       }
-    }
-
-    if (shouldPull) {
       sendEvent('pull-start', `开始拉取新镜像: ${image}`);
 
       await new Promise((resolve, reject) => {
