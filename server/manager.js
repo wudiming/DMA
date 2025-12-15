@@ -3078,7 +3078,18 @@ app.post('/api/stacks/:name/import-config', async (req, res) => {
     const currentEndpointId = req.headers['x-endpoint-id'] || 'local';
 
     // 使用数字ID创建目录
-    const stackId = getNextStackId();
+    // Check if stack already exists
+    let stackId;
+    let existingStack = Array.from(stacks.values()).find(s => s.name === name);
+
+    if (existingStack) {
+      stackId = existingStack.id;
+      console.log(`[Stack Import] Updating existing stack: ${name} (${stackId})`);
+    } else {
+      stackId = getNextStackId();
+      console.log(`[Stack Import] Creating new stack: ${name} (${stackId})`);
+    }
+
     const stackDir = path.join(STACKS_DIR, stackId);
 
     // 1. 创建堆栈目录

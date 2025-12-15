@@ -948,12 +948,16 @@ function TemplateCard({ template, isDark, onDeploy, onEdit, onDelete }) {
                             {template.title || template.name}
                         </h3>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-800'}`}>
-                            {template.category}
+                            {t(`stacks.category_${template.category.toLowerCase()}`, { defaultValue: template.category })}
                         </span>
                     </div>
 
                     <div className={`flex items-center gap-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                        <span className="truncate">{template.description || t('stacks.no_description')}</span>
+                        <span className="truncate">
+                            {template.description && template.description.startsWith('Imported from stack ')
+                                ? t('stacks.imported_from', { name: template.description.replace('Imported from stack ', '') })
+                                : (template.description || t('stacks.no_description'))}
+                        </span>
                         {template.tags && template.tags.length > 0 && (
                             <>
                                 <span className="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
@@ -963,7 +967,7 @@ function TemplateCard({ template, isDark, onDeploy, onEdit, onDelete }) {
                                             key={idx}
                                             className={`px-2 py-0.5 rounded text-xs ${isDark ? 'bg-white/5 text-gray-400' : 'bg-gray-100 text-gray-600'}`}
                                         >
-                                            {tag}
+                                            {t(`stacks.tag_${tag.toLowerCase()}`, { defaultValue: tag })}
                                         </span>
                                     ))}
                                 </div>

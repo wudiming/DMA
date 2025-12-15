@@ -381,6 +381,9 @@
         "config_validation_fail": "配置验证失败",
         "saving": "保存中...",
         "save_config": "保存配置",
-        "take_over_save": "接管并保存"
+        "take_over_save": "接管并保存",
+        "category_custom": "自定义",
+        "tag_imported": "已导入",
+        "imported_from": "从堆栈 {{name}} 导入"
     }
 }
