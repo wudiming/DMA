@@ -973,7 +973,10 @@ app.post('/api/containers/create', async (req, res) => {
         // Explicitly create and start the container to ensure it runs on remote nodes
         const updaterContainer = await dockerInstance.createContainer({
           Image: updaterImage,
-          Cmd: ['sh', '-c', updaterCmdScript],
+          Entrypoint: ['sh', '-c'], // 强制覆盖 Entrypoint，确保 Cmd 作为 shell 脚本执行
+          Cmd: [updaterCmdScript],  // 注意：这里不需要再加 'sh', '-c'，因为 Entrypoint 已经是了，或者 Entrypoint 为空，Cmd 为 ['sh', '-c', script]
+          // 修正：如果 Entrypoint 是 sh -c，那么 Cmd 应该是 [script]
+          // 为了保险，我们使用 Entrypoint=['sh', '-c'] 和 Cmd=[script]
           name: `${name}-updater-${Date.now()}`,
           HostConfig: {
             Binds: [dockerSocketBind],

@@ -715,13 +715,17 @@ function UnraidContainerCard({
   const isStack = container.Labels && (container.Labels['com.docker.compose.project'] || container.Labels['com.docker.stack.namespace']);
 
   const [menuPosition, setMenuPosition] = React.useState('top');
+  const buttonRef = React.useRef(null); // 新增：引用按钮元素
 
   React.useEffect(() => {
-    if (isMenuOpen && menuRef.current) {
-      const rect = menuRef.current.getBoundingClientRect();
+    if (isMenuOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
       const windowHeight = window.innerHeight;
-      // 如果菜单底部超出窗口高度，则向上显示
-      if (rect.bottom > windowHeight) {
+      const spaceBelow = windowHeight - rect.bottom;
+
+      // 如果下方空间小于 250px (菜单大概高度)，则向上显示
+      // 使用按钮位置判断是确定性的，不会受菜单自身渲染影响
+      if (spaceBelow < 250) {
         setMenuPosition('bottom');
       } else {
         setMenuPosition('top');
@@ -735,6 +739,7 @@ function UnraidContainerCard({
         {/* Unraid风格：左侧大图标 + 点击菜单 */}
         <div className="relative flex-shrink-0">
           <div
+            ref={buttonRef} // 绑定 ref 到按钮
             onClick={onIconClick}
             className={`w-16 h-16 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'} cursor-pointer transition-all hover:scale-105 ${isMenuOpen ? 'ring-2 ring-cyan-400' : ''} overflow-hidden`}
           >
