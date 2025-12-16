@@ -714,6 +714,21 @@ function UnraidContainerCard({
   const navigate = useNavigate();
   const isStack = container.Labels && (container.Labels['com.docker.compose.project'] || container.Labels['com.docker.stack.namespace']);
 
+  const [menuPosition, setMenuPosition] = React.useState('top');
+
+  React.useEffect(() => {
+    if (isMenuOpen && menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      // 如果菜单底部超出窗口高度，则向上显示
+      if (rect.bottom > windowHeight) {
+        setMenuPosition('bottom');
+      } else {
+        setMenuPosition('top');
+      }
+    }
+  }, [isMenuOpen]);
+
   return (
     <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-lg p-4 border transition-all hover:shadow-lg relative`}>
       <div className="flex items-start gap-4">
@@ -732,11 +747,14 @@ function UnraidContainerCard({
           {/* 状态指示器 */}
           <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full ${getStatusColor()} border-2 ${isDark ? 'border-gray-900' : 'border-white'} shadow-lg`}></div>
 
-          {/* Unraid风格操作菜单 */}
           {isMenuOpen && (
             <div
               ref={menuRef}
-              className={`absolute left-full ml-2 top-0 w-56 ${isDark ? 'glass-menu-dark' : 'glass-menu-light'} rounded-lg overflow-hidden z-[100] animate-in fade-in slide-in-from-left-2 duration-200`}
+              style={{
+                top: menuPosition === 'top' ? '0' : 'auto',
+                bottom: menuPosition === 'bottom' ? '0' : 'auto'
+              }}
+              className={`absolute left-full ml-2 w-56 ${isDark ? 'glass-menu-dark' : 'glass-menu-light'} rounded-lg overflow-hidden z-[100] animate-in fade-in slide-in-from-left-2 duration-200`}
             >
               {hasWebUI && webUIUrl && (
                 <>

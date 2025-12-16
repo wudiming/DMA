@@ -947,7 +947,8 @@ app.post('/api/containers/create', async (req, res) => {
         const base64Command = Buffer.from(runCommand).toString('base64');
         // 尝试在更新后删除旧镜像
         const oldImageId = oldInfo.Image;
-        const updaterCmdScript = `sleep 10 && docker rm -f ${name} && (echo "${base64Command}" | base64 -d | sh) && (docker rmi ${oldImageId} || true)`;
+        // 增加 docker pull 确保使用最新镜像 (即使前面的 pull 跳过了)
+        const updaterCmdScript = `sleep 10 && docker rm -f ${name} && docker pull ${image} && (echo "${base64Command}" | base64 -d | sh) && (docker rmi ${oldImageId} || true)`;
 
         console.log(`[Self Update] Updater script (base64): ${base64Command}`);
 
