@@ -804,6 +804,67 @@ app.post('/api/containers/create', async (req, res) => {
     }
 
     if (shouldPull) {
+      // Smart Tagging: 尝试在拉取新镜像前备份旧镜像
+      try {
+        const oldImage = dockerInstance.getImage(image);
+        const oldImageInfo = await oldImage.inspect();
+
+        // 只有当旧镜像ID与即将拉取的不同时才需要备份？
+        // 但我们还没拉取，不知道新镜像ID。
+        // 所以只要存在同名镜像，就应该备份，因为 pull 会覆盖标签。
+
+        // 1. 尝试提取版本号
+        let version = null;
+        const envs = oldImageInfo.Config.Env || [];
+        const labels = oldImageInfo.Config.Labels || {};
+
+        // 优先级：Labels > Env
+        // 常见版本标签/变量名
+        const versionKeys = ['org.opencontainers.image.version', 'version', 'VERSION', 'app_version', 'APP_VERSION', 'GHOST_VERSION'];
+
+        for (const key of versionKeys) {
+          if (labels[key]) {
+            version = labels[key];
+            break;
+          }
+        }
+
+        if (!version) {
+          for (const key of versionKeys) {
+            const env = envs.find(e => e.startsWith(`${key}=`));
+            if (env) {
+              version = env.split('=')[1];
+              break;
+            }
+          }
+        }
+
+        // 2. 构建新标签
+        const repo = image.split(':')[0]; // nginx:latest -> nginx
+        const currentTag = image.split(':')[1] || 'latest';
+        let newTag;
+
+        if (version && version !== currentTag) {
+          newTag = version;
+        } else {
+          // 无法提取版本或版本与当前标签一致，使用时间戳
+          const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+          newTag = `${currentTag}-${timestamp}`;
+        }
+
+        const fullNewTag = `${repo}:${newTag}`;
+
+        // 3. 执行重命名 (Tag)
+        console.log(`[Smart Tagging] Backing up ${image} to ${fullNewTag}`);
+        sendEvent('info', `正在备份旧镜像为: ${fullNewTag}`);
+
+        await oldImage.tag({ repo: repo, tag: newTag });
+
+      } catch (e) {
+        // 镜像不存在或无法备份，忽略
+        // console.log('[Smart Tagging] No existing image to backup or backup failed:', e.message);
+      }
+
       sendEvent('pull-start', `开始拉取新镜像: ${image}`);
 
       await new Promise((resolve, reject) => {
