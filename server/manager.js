@@ -2897,145 +2897,143 @@ app.post('/api/stacks/:name/deploy', async (req, res) => {
       }
 
       if (shouldPull) {
-        if (shouldPull) {
-          // Smart Tagging Phase 1: Pre-pull Backup
-          try {
-            const oldImage = dockerInstance.getImage(imageName);
-            const oldImageInfo = await oldImage.inspect();
+        // Smart Tagging Phase 1: Pre-pull Backup
+        try {
+          const oldImage = dockerInstance.getImage(imageName);
+          const oldImageInfo = await oldImage.inspect();
 
-            const version = extractImageVersion(oldImageInfo);
+          const version = extractImageVersion(oldImageInfo);
 
-            const repo = imageName.split(':')[0];
-            const currentTag = imageName.split(':')[1] || 'latest';
-            let backupTag;
+          const repo = imageName.split(':')[0];
+          const currentTag = imageName.split(':')[1] || 'latest';
+          let backupTag;
 
-            if (version && version !== currentTag) {
-              backupTag = version;
-            } else {
-              const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-              backupTag = `${currentTag}-${timestamp}`;
-            }
-
-            const fullBackupTag = `${repo}:${backupTag}`;
-
-            console.log(`[Stack Smart Tagging] Backing up ${imageName} to ${fullBackupTag}`);
-            sendEvent('info', `正在备份旧镜像为: ${fullBackupTag}`);
-
-            await oldImage.tag({ repo: repo, tag: backupTag });
-
-          } catch (e) {
-            // Ignore
+          if (version && version !== currentTag) {
+            backupTag = version;
+          } else {
+            const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+            backupTag = `${currentTag}-${timestamp}`;
           }
+
+          const fullBackupTag = `${repo}:${backupTag}`;
+
+          console.log(`[Stack Smart Tagging] Backing up ${imageName} to ${fullBackupTag}`);
+          sendEvent('info', `正在备份旧镜像为: ${fullBackupTag}`);
+
+          await oldImage.tag({ repo: repo, tag: backupTag });
+
+        } catch (e) {
+          // Ignore
         }
 
-        if (shouldPull) {
-          sendEvent('pull-start', `开始拉取新镜像: ${imageName}`);
+        sendEvent('pull-start', `开始拉取新镜像: ${imageName}`);
 
-          try {
-            await new Promise((resolve, reject) => {
-              dockerInstance.pull(imageName, (err, stream) => {
-                if (err) return reject(err);
+        try {
+          await new Promise((resolve, reject) => {
+            dockerInstance.pull(imageName, (err, stream) => {
+              if (err) return reject(err);
 
-                dockerInstance.modem.followProgress(stream,
-                  (err, output) => {
-                    if (err) return reject(err);
-                    console.log(`[Stack Deploy] Image pull completed: ${imageName}`);
-                    resolve(output);
-                  },
-                  (progress) => {
-                    sendEvent('pull', 'Pulling', progress);
-                  }
-                );
-              });
-            });
-            sendEvent('success', '镜像拉取完成');
-
-            // Smart Tagging Phase 2: Post-pull New Image Tagging
-            try {
-              const newImage = dockerInstance.getImage(imageName);
-              const newImageInfo = await newImage.inspect();
-              const newVersion = extractImageVersion(newImageInfo);
-
-              if (newVersion) {
-                const repo = imageName.split(':')[0];
-                const currentTag = imageName.split(':')[1] || 'latest';
-
-                if (newVersion !== currentTag) {
-                  const fullNewVersionTag = `${repo}:${newVersion}`;
-                  console.log(`[Stack Smart Tagging] Tagging new image ${imageName} as ${fullNewVersionTag}`);
-                  sendEvent('info', `为新镜像添加版本标签: ${fullNewVersionTag}`);
-                  await newImage.tag({ repo: repo, tag: newVersion });
+              dockerInstance.modem.followProgress(stream,
+                (err, output) => {
+                  if (err) return reject(err);
+                  console.log(`[Stack Deploy] Image pull completed: ${imageName}`);
+                  resolve(output);
+                },
+                (progress) => {
+                  sendEvent('pull', 'Pulling', progress);
                 }
-              }
-            } catch (e) {
-              console.warn('[Stack Smart Tagging] Failed to tag new image:', e.message);
-            }
+              );
+            });
+          });
+          sendEvent('success', '镜像拉取完成');
 
-          } catch (pullError) {
-            console.warn(`[Stack Deploy] Failed to pull image ${imageName}:`, pullError);
-            sendEvent('warning', `无法拉取镜像 ${imageName}: ${pullError.message}，尝试使用本地镜像...`);
-          }
-        }
-
-
-        // 3. 执行 docker compose up
-        sendEvent('step', '启动堆栈容器');
-
-        // 使用 executeCompose 确保统一的项目命名逻辑 (-p stackName)
-        const endpoint = endpoints.get(req.headers['x-endpoint-id'] || 'local');
-        await stackManager.executeCompose(
-          `up -d`,
-          stackDir,
-          endpoint,
-          name, // 传递 stackName
-          (line) => sendEvent('log', line) // 合并 stdout/stderr 回调
-        );
-
-        sendEvent('success', '堆栈部署成功');
-
-        // 更新状态
-        metadata.status = 'running';
-        metadata.updatedAt = new Date().toISOString();
-        saveStackMetadata(name, metadata);
-
-        // 发送完成事件
-        sendEvent('done', '部署完成');
-        res.end();
-
-      } catch (error) {
-        console.error(`[Stack Deploy] Failed to deploy stack ${name}:`, error);
-
-        if (!res.headersSent) {
-          res.setHeader('Content-Type', 'application/x-ndjson');
-          res.setHeader('Transfer-Encoding', 'chunked');
-          const sendEvent = (type, message) => {
-            res.write(JSON.stringify({ type, message }) + '\n');
-          };
-          sendEvent('error', error.message);
-        } else {
-          res.write(JSON.stringify({ type: 'error', message: error.message }) + '\n');
-        }
-        res.end();
-
-        // 如果是新创建的堆栈且部署失败，则清理
-        if (isNew) {
+          // Smart Tagging Phase 2: Post-pull New Image Tagging
           try {
-            console.log(`[Stack Deploy] Cleaning up failed new stack: ${name}`);
-            const endpointId = req.headers['x-endpoint-id'] || 'local';
-            const meta = findStack(name, endpointId);
-            if (meta) {
-              const stackDir = path.join(STACKS_DIR, meta.id);
-              if (fs.existsSync(stackDir)) {
-                fs.rmSync(stackDir, { recursive: true, force: true });
+            const newImage = dockerInstance.getImage(imageName);
+            const newImageInfo = await newImage.inspect();
+            const newVersion = extractImageVersion(newImageInfo);
+
+            if (newVersion) {
+              const repo = imageName.split(':')[0];
+              const currentTag = imageName.split(':')[1] || 'latest';
+
+              if (newVersion !== currentTag) {
+                const fullNewVersionTag = `${repo}:${newVersion}`;
+                console.log(`[Stack Smart Tagging] Tagging new image ${imageName} as ${fullNewVersionTag}`);
+                sendEvent('info', `为新镜像添加版本标签: ${fullNewVersionTag}`);
+                await newImage.tag({ repo: repo, tag: newVersion });
               }
-              stacks.delete(meta.id);
             }
-          } catch (cleanupError) {
-            console.error(`[Stack Deploy] Failed to cleanup stack ${name}:`, cleanupError);
+          } catch (e) {
+            console.warn('[Stack Smart Tagging] Failed to tag new image:', e.message);
           }
+
+        } catch (pullError) {
+          console.warn(`[Stack Deploy] Failed to pull image ${imageName}:`, pullError);
+          sendEvent('warning', `无法拉取镜像 ${imageName}: ${pullError.message}，尝试使用本地镜像...`);
         }
       }
-    });
+    }
+
+
+    // 3. 执行 docker compose up
+    sendEvent('step', '启动堆栈容器');
+
+    // 使用 executeCompose 确保统一的项目命名逻辑 (-p stackName)
+    const endpoint = endpoints.get(req.headers['x-endpoint-id'] || 'local');
+    await stackManager.executeCompose(
+      `up -d`,
+      stackDir,
+      endpoint,
+      name, // 传递 stackName
+      (line) => sendEvent('log', line) // 合并 stdout/stderr 回调
+    );
+
+    sendEvent('success', '堆栈部署成功');
+
+    // 更新状态
+    metadata.status = 'running';
+    metadata.updatedAt = new Date().toISOString();
+    saveStackMetadata(name, metadata);
+
+    // 发送完成事件
+    sendEvent('done', '部署完成');
+    res.end();
+
+  } catch (error) {
+    console.error(`[Stack Deploy] Failed to deploy stack ${name}:`, error);
+
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/x-ndjson');
+      res.setHeader('Transfer-Encoding', 'chunked');
+      const sendEvent = (type, message) => {
+        res.write(JSON.stringify({ type, message }) + '\n');
+      };
+      sendEvent('error', error.message);
+    } else {
+      res.write(JSON.stringify({ type: 'error', message: error.message }) + '\n');
+    }
+    res.end();
+
+    // 如果是新创建的堆栈且部署失败，则清理
+    if (isNew) {
+      try {
+        console.log(`[Stack Deploy] Cleaning up failed new stack: ${name}`);
+        const endpointId = req.headers['x-endpoint-id'] || 'local';
+        const meta = findStack(name, endpointId);
+        if (meta) {
+          const stackDir = path.join(STACKS_DIR, meta.id);
+          if (fs.existsSync(stackDir)) {
+            fs.rmSync(stackDir, { recursive: true, force: true });
+          }
+          stacks.delete(meta.id);
+        }
+      } catch (cleanupError) {
+        console.error(`[Stack Deploy] Failed to cleanup stack ${name}:`, cleanupError);
+      }
+    }
+  }
+});
 
 // 启动堆栈 (旧接口保留用于简单的启动操作)
 app.post('/api/stacks/:name/start', async (req, res) => {
