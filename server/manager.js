@@ -2860,6 +2860,64 @@ app.post('/api/stacks/:name/deploy', async (req, res) => {
       }
 
       if (shouldPull) {
+        // Smart Tagging: 尝试在拉取新镜像前备份旧镜像
+        try {
+          const oldImage = dockerInstance.getImage(imageName);
+          const oldImageInfo = await oldImage.inspect();
+
+          // 1. 尝试提取版本号
+          let version = null;
+          const envs = oldImageInfo.Config.Env || [];
+          const labels = oldImageInfo.Config.Labels || {};
+
+          // 优先级：Labels > Env
+          const versionKeys = ['org.opencontainers.image.version', 'version', 'VERSION', 'app_version', 'APP_VERSION', 'GHOST_VERSION'];
+
+          for (const key of versionKeys) {
+            if (labels[key]) {
+              version = labels[key];
+              break;
+            }
+          }
+
+          if (!version) {
+            for (const key of versionKeys) {
+              const env = envs.find(e => e.startsWith(`${key}=`));
+              if (env) {
+                version = env.split('=')[1];
+                break;
+              }
+            }
+          }
+
+          // 2. 构建新标签
+          const repo = imageName.split(':')[0];
+          const currentTag = imageName.split(':')[1] || 'latest';
+          let newTag;
+
+          if (version && version !== currentTag) {
+            newTag = version;
+          } else {
+            // 无法提取版本或版本与当前标签一致，使用时间戳
+            const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+            newTag = `${currentTag}-${timestamp}`;
+          }
+
+          const fullNewTag = `${repo}:${newTag}`;
+
+          // 3. 执行重命名 (Tag)
+          console.log(`[Stack Smart Tagging] Backing up ${imageName} to ${fullNewTag}`);
+          sendEvent('info', `正在备份旧镜像为: ${fullNewTag}`);
+
+          await oldImage.tag({ repo: repo, tag: newTag });
+
+        } catch (e) {
+          // 镜像不存在或无法备份，忽略
+          // console.log('[Stack Smart Tagging] No existing image to backup or backup failed:', e.message);
+        }
+      }
+
+      if (shouldPull) {
         sendEvent('pull-start', `开始拉取新镜像: ${imageName}`);
 
         try {
