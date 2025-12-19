@@ -2604,6 +2604,7 @@ app.put('/api/stacks/templates/:name', (req, res) => {
     if (composeContent) {
       const composePath = path.join(TEMPLATES_DIR, name, 'docker-compose.yml');
       fs.writeFileSync(composePath, composeContent, 'utf8');
+      templateInfo.composeContent = composeContent;
     }
 
     saveTemplateInfo(name, templateInfo);
