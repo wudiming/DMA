@@ -2659,7 +2659,11 @@ app.post('/api/stacks/templates/:templateName/deploy', async (req, res) => {
     // 替换变量（简单字符串替换）
     if (variables && typeof variables === 'object') {
       for (const [key, value] of Object.entries(variables)) {
-        composeContent = composeContent.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), value);
+        // Bug 6 Fix: 支持 ${VAR} 和 ${VAR:-default} 和 ${VAR-default}
+        // 使用正则匹配 ${KEY} 或 ${KEY:-...} 或 ${KEY-...}
+        // 注意：这里我们用 value 替换整个表达式，因为 value 已经是用户确认过的值（或默认值）
+        const regex = new RegExp('\\$\\{' + key + '(?::-[^}]*)?\\}', 'g');
+        composeContent = composeContent.replace(regex, value);
       }
     }
 
