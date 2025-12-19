@@ -242,9 +242,13 @@ export default function Stacks() {
         }
 
         try {
+            // Bug 2 Fix: 构建变量替换对象
+            const variables = env.reduce((acc, curr) => ({ ...acc, [curr.name]: curr.value }), {});
+
             await axios.post(`/api/stacks/templates/${selectedTemplate.name}/deploy`, {
                 stackName,
                 env,
+                variables,
                 skipDeploy: true
             });
             setShowDeployModal(false);

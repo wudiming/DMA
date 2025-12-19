@@ -2662,6 +2662,55 @@ app.post('/api/stacks/templates/:templateName/deploy', async (req, res) => {
       }
     }
 
+    // 处理 env_file (Bug 4 Fix)
+    // 尝试读取 env_file 并注入到环境变量中
+    try {
+      const composeDoc = yaml.load(composeContent);
+      if (composeDoc && composeDoc.services) {
+        const injectedEnv = [];
+        for (const service of Object.values(composeDoc.services)) {
+          if (service.env_file) {
+            const envFiles = Array.isArray(service.env_file) ? service.env_file : [service.env_file];
+            for (const filePath of envFiles) {
+              try {
+                if (fs.existsSync(filePath)) {
+                  console.log(`Loading env_file: ${filePath}`);
+                  const fileContent = fs.readFileSync(filePath, 'utf8');
+                  fileContent.split('\n').forEach(line => {
+                    line = line.trim();
+                    if (line && !line.startsWith('#')) {
+                      const [k, ...v] = line.split('=');
+                      if (k && v) {
+                        const val = v.join('=').replace(/^['"]|['"]$/g, ''); // 去除引号
+                        // 避免重复
+                        if (!injectedEnv.find(e => e.name === k)) {
+                          injectedEnv.push({ name: k, value: val });
+                        }
+                      }
+                    }
+                  });
+                } else {
+                  console.warn(`env_file not found: ${filePath}`);
+                }
+              } catch (err) {
+                console.warn(`Failed to read env_file ${filePath}:`, err);
+              }
+            }
+          }
+        }
+
+        // 合并注入的环境变量 (用户提供的优先)
+        if (injectedEnv.length > 0) {
+          const userEnv = req.body.env || [];
+          // 过滤掉用户已定义的变量
+          const newEnv = injectedEnv.filter(ie => !userEnv.find(ue => ue.name === ie.name));
+          req.body.env = [...userEnv, ...newEnv];
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse compose for env_file processing:', e);
+    }
+
     // 创建堆栈目录 (使用数字ID)
     const stackId = getNextStackId();
     const stackDir = path.join(STACKS_DIR, stackId);
@@ -2710,6 +2759,15 @@ app.post('/api/stacks/templates/:templateName/deploy', async (req, res) => {
         saveStackMetadata(stackName, metadata);
       } catch (deployError) {
         console.error(`Deploy error for ${stackName}:`, deployError);
+        // Bug 3 Fix: 部署失败时清理堆栈
+        try {
+          fs.rmSync(stackDir, { recursive: true, force: true });
+          stacks.delete(stackId);
+          console.log(`Cleaned up failed stack: ${stackName}`);
+        } catch (cleanupError) {
+          console.error('Failed to cleanup stack:', cleanupError);
+        }
+        throw deployError; // 重新抛出错误以便返回 500
       }
     }
 
