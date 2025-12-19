@@ -1022,13 +1022,19 @@ function TemplateCard({ template, isDark, onDeploy, onEdit, onDelete }) {
 // Helper to extract variables from Compose content
 function extractVariablesFromCompose(content) {
     if (!content) return [];
-    const regex = /\$\{([A-Z0-9_]+)\}/g;
-    const vars = new Set();
+    // 支持 ${VAR} 和 ${VAR:-default} 和 ${VAR-default}
+    const regex = /\$\{([A-Z0-9_]+)(?::?-([^}]+))?\}/g;
+    const vars = new Map(); // Use Map to deduplicate by name
     let match;
     while ((match = regex.exec(content)) !== null) {
-        vars.add(match[1]);
+        const name = match[1];
+        const defaultValue = match[2];
+        // 如果已存在且没有默认值，而当前有默认值，则更新
+        if (!vars.has(name) || (!vars.get(name).defaultValue && defaultValue)) {
+            vars.set(name, { name, defaultValue });
+        }
     }
-    return Array.from(vars);
+    return Array.from(vars.values());
 }
 
 
@@ -1282,11 +1288,16 @@ function DeployModal({ isDark, template, onDeploy, onClose }) {
         // 如果模板本身有预设变量，优先使用预设值
         const presetEnvMap = new Map((template.env || []).map(e => [e.name, e]));
 
-        return extracted.map(varName => {
-            const preset = presetEnvMap.get(varName);
+        return extracted.map(variable => {
+            const preset = presetEnvMap.get(variable.name);
+            // 优先级：预设值 > 提取的默认值 > 空字符串
+            const initialValue = preset
+                ? (preset.default || preset.value || '')
+                : (variable.defaultValue || '');
+
             return {
-                name: varName,
-                value: preset ? (preset.default || preset.value || '') : '',
+                name: variable.name,
+                value: initialValue,
                 label: preset ? (preset.label || '') : ''
             };
         });
