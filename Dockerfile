@@ -36,7 +36,7 @@ EXPOSE 9000 9002
 # Environment variables
 ENV PORT=9000
 ENV NODE_ENV=production
-ENV APP_VERSION=1.0.6
+ENV APP_VERSION=1.0.7
 
 # Start command
 CMD ["node", "index.js"]

@@ -41,11 +41,6 @@ export default function EndpointSelector({ isDark, popupDirection = 'down' }) {
                     <div className="flex-1 min-w-0 text-left">
                         <div className={`text-sm font-medium truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
                             {currentEndpointData?.name || t('endpoint.local')}
-                            {currentEndpointData?.host && (
-                                <span className={`ml-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                                    {currentEndpointData.host}
-                                </span>
-                            )}
                         </div>
                     </div>
                     <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
@@ -75,11 +70,6 @@ export default function EndpointSelector({ isDark, popupDirection = 'down' }) {
                                     <div className="flex items-center gap-2">
                                         <div className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
                                             {endpoint.name}
-                                            {endpoint.host && (
-                                                <span className={`ml-2 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                                                    {endpoint.host}
-                                                </span>
-                                            )}
                                         </div>
                                     </div>
                                     {endpoint.id === currentEndpoint && (

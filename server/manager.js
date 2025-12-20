@@ -1745,6 +1745,43 @@ app.post('/api/endpoints', async (req, res) => {
   }
 });
 
+app.put('/api/endpoints/reorder', async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) {
+    return res.status(400).json({ error: 'ids must be an array' });
+  }
+
+  try {
+    const newEndpointsMap = new Map();
+
+    // Rebuild map in the new order
+    for (const id of ids) {
+      if (endpoints.has(id)) {
+        newEndpointsMap.set(id, endpoints.get(id));
+      }
+    }
+
+    // Append any missing endpoints (just in case)
+    for (const [id, endpoint] of endpoints) {
+      if (!newEndpointsMap.has(id)) {
+        newEndpointsMap.set(id, endpoint);
+      }
+    }
+
+    // Update global map
+    endpoints.clear();
+    for (const [id, endpoint] of newEndpointsMap) {
+      endpoints.set(id, endpoint);
+    }
+
+    saveEndpoints(endpoints);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to reorder endpoints:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete('/api/endpoints/:id', async (req, res) => {
   const { id } = req.params;
   if (id === 'local') {

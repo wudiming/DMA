@@ -724,11 +724,21 @@ function UnraidContainerCard({
       const spaceBelow = windowHeight - rect.bottom;
 
       // 如果下方空间小于 250px (菜单大概高度)，则向上显示
-      // 使用按钮位置判断是确定性的，不会受菜单自身渲染影响
-      if (spaceBelow < 250) {
-        setMenuPosition('bottom');
+      // Dark Mode 下用户偏好向上显示 (above the entry)
+      if (isDark) {
+        // 优先向上，除非上方空间不足
+        if (rect.top > 250) {
+          setMenuPosition('bottom');
+        } else {
+          setMenuPosition('top');
+        }
       } else {
-        setMenuPosition('top');
+        // Light Mode 保持原有逻辑 (优先向下)
+        if (spaceBelow < 250) {
+          setMenuPosition('bottom');
+        } else {
+          setMenuPosition('top');
+        }
       }
     }
   }, [isMenuOpen]);

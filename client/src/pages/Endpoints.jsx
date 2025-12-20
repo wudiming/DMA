@@ -18,7 +18,8 @@ import {
     CheckCircle,
     XCircle,
     MoreVertical,
-    Edit2
+    Edit2,
+    Menu
 } from 'lucide-react';
 import axios from 'axios';
 import { useThemeStore } from '../store/themeStore';
@@ -43,6 +44,50 @@ export default function Endpoints() {
         secret: ''
     });
     const { refreshEndpoints: globalRefreshEndpoints, currentEndpoint } = useEndpoint();
+    const [draggedItem, setDraggedItem] = useState(null);
+
+    const handleDragStart = (e, index) => {
+        setDraggedItem(endpoints[index]);
+        e.dataTransfer.effectAllowed = "move";
+        // Set transparent image to hide default ghost
+        // const img = new Image();
+        // img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        // e.dataTransfer.setDragImage(img, 0, 0);
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        const draggedOverItem = endpoints[index];
+
+        // if the item is dragged over itself, ignore
+        if (draggedItem === draggedOverItem) {
+            return;
+        }
+
+        // filter out the currently dragged item
+        let items = endpoints.filter(item => item !== draggedItem);
+
+        // add the dragged item after the dragged over item
+        items.splice(index, 0, draggedItem);
+
+        setEndpoints(items);
+    };
+
+    const handleDrop = async (e, index) => {
+        e.preventDefault();
+        setDraggedItem(null);
+
+        // Persist the new order
+        try {
+            const ids = endpoints.map(e => e.id);
+            await axios.put('/api/endpoints/reorder', { ids });
+            globalRefreshEndpoints(); // Sync global context
+        } catch (error) {
+            console.error('Failed to save endpoint order:', error);
+            // Optionally revert state on error
+            fetchEndpoints();
+        }
+    };
 
     const fetchEndpoints = async () => {
         try {
@@ -229,12 +274,15 @@ export default function Endpoints() {
 
                 {/* Endpoints列表 */}
                 <div className="space-y-4">
-                    {endpoints.map((endpoint) => (
+                    {endpoints.map((endpoint, index) => (
                         <div
                             key={endpoint.id}
-                            className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-xl border p-4 flex items-center justify-between transition-all hover:shadow-md`}
+                            onDragOver={(e) => handleDragOver(e, index)}
+                            onDrop={(e) => handleDrop(e, index)}
+                            className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-xl border p-4 flex items-center justify-between transition-all hover:shadow-md group`}
                         >
                             <div className="flex items-center gap-4">
+
                                 {/* 图标 */}
                                 <div className={`w-12 h-12 rounded-xl ${isDark ? 'bg-purple-500/20' : 'bg-purple-50'} flex items-center justify-center flex-shrink-0`}>
                                     <Server className={`w-6 h-6 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
@@ -303,218 +351,237 @@ export default function Endpoints() {
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 )}
+                                {/* Drag Handle (Right Side) */}
+                                <div
+                                    draggable
+                                    onDragStart={(e) => {
+                                        // Set the drag image to the entire row
+                                        const row = e.currentTarget.closest('.group');
+                                        if (row) {
+                                            e.dataTransfer.setDragImage(row, 0, 0);
+                                        }
+                                        handleDragStart(e, index);
+                                    }}
+                                    className={`p-2 cursor-grab ${isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    <Menu className="w-5 h-5" />
+                                </div>
+
                             </div>
                         </div>
                     ))}
                 </div>
-            </main>
+            </main >
 
             {/* 添加节点模态框 */}
-            {showAddModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className={`w-full max-w-md rounded-2xl p-6 ${isDark ? 'glass border border-white/10' : 'bg-white shadow-xl'}`}>
-                        <h2 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('endpoint.add_modal_title')}</h2>
+            {
+                showAddModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className={`w-full max-w-md rounded-2xl p-6 ${isDark ? 'glass border border-white/10' : 'bg-white shadow-xl'}`}>
+                            <h2 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('endpoint.add_modal_title')}</h2>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                    {t('endpoint.name_label')}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newEndpoint.name}
-                                    onChange={(e) => setNewEndpoint({ ...newEndpoint, name: e.target.value })}
-                                    className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
-                                        ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
-                                        : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
-                                        }`}
-                                    placeholder={t('endpoint.name_placeholder')}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="col-span-2">
-                                    <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        {t('endpoint.host_label')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={newEndpoint.host}
-                                        onChange={(e) => setNewEndpoint({ ...newEndpoint, host: e.target.value })}
-                                        className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
-                                            ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
-                                            : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
-                                            }`}
-                                        placeholder="192.168.1.100"
-                                    />
-                                </div>
+                            <div className="space-y-4">
                                 <div>
                                     <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        {t('endpoint.port_label')}
+                                        {t('endpoint.name_label')}
                                     </label>
                                     <input
                                         type="text"
-                                        value={newEndpoint.port}
-                                        onChange={(e) => setNewEndpoint({ ...newEndpoint, port: e.target.value })}
+                                        value={newEndpoint.name}
+                                        onChange={(e) => setNewEndpoint({ ...newEndpoint, name: e.target.value })}
                                         className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
                                             ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
                                             : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
                                             }`}
-                                        placeholder="9002"
+                                        placeholder={t('endpoint.name_placeholder')}
                                     />
                                 </div>
-                            </div>
 
-                            <div>
-                                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                    {t('endpoint.secret_label')}
-                                </label>
-                                <input
-                                    type="password"
-                                    value={newEndpoint.secret}
-                                    onChange={(e) => setNewEndpoint({ ...newEndpoint, secret: e.target.value })}
-                                    className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
-                                        ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
-                                        : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
-                                        }`}
-                                    placeholder={t('endpoint.secret_hint_placeholder')}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => setShowAddModal(false)}
-                                className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}
-                            >
-                                {t('common.cancel')}
-                            </button>
-                            <button
-                                onClick={handleAdd}
-                                className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
-                            >
-                                {t('common.create')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 编辑节点模态框 */}
-            {showEditModal && editingEndpoint && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className={`w-full max-w-md rounded-2xl p-6 ${isDark ? 'glass border border-white/10' : 'bg-white shadow-xl'}`}>
-                        <h2 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('endpoint.edit_modal_title')}</h2>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                    {t('endpoint.name_label')}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={editingEndpoint.name}
-                                    onChange={(e) => setEditingEndpoint({ ...editingEndpoint, name: e.target.value })}
-                                    className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
-                                        ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
-                                        : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
-                                        }`}
-                                />
-                            </div>
-
-                            {editingEndpoint.id === 'local' && (
-                                <div>
-                                    <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        {t('endpoint.host_ip_label')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={editingEndpoint.host || ''}
-                                        onChange={(e) => setEditingEndpoint({ ...editingEndpoint, host: e.target.value })}
-                                        className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
-                                            ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
-                                            : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
-                                            }`}
-                                        placeholder="例如: 192.168.1.100"
-                                    />
-                                    <p className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                                        {t('endpoint.host_ip_hint')}
-                                    </p>
-                                </div>
-                            )}
-
-                            {editingEndpoint.id !== 'local' && (
-                                <>
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="col-span-2">
-                                            <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                {t('endpoint.host_label')}
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={editingEndpoint.host}
-                                                onChange={(e) => setEditingEndpoint({ ...editingEndpoint, host: e.target.value })}
-                                                className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
-                                                    ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
-                                                    : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
-                                                    }`}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                {t('endpoint.port_label')}
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={editingEndpoint.port}
-                                                onChange={(e) => setEditingEndpoint({ ...editingEndpoint, port: e.target.value })}
-                                                className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
-                                                    ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
-                                                    : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
-                                                    }`}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="col-span-2">
                                         <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                            {t('endpoint.secret_label')}
+                                            {t('endpoint.host_label')}
                                         </label>
                                         <input
-                                            type="password"
-                                            value={editingEndpoint.secret || ''}
-                                            onChange={(e) => setEditingEndpoint({ ...editingEndpoint, secret: e.target.value })}
+                                            type="text"
+                                            value={newEndpoint.host}
+                                            onChange={(e) => setNewEndpoint({ ...newEndpoint, host: e.target.value })}
                                             className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
                                                 ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
                                                 : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
                                                 }`}
-                                            placeholder={t('endpoint.secret_placeholder')}
+                                            placeholder="192.168.1.100"
                                         />
                                     </div>
-                                </>
-                            )}
-                        </div>
+                                    <div>
+                                        <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                            {t('endpoint.port_label')}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={newEndpoint.port}
+                                            onChange={(e) => setNewEndpoint({ ...newEndpoint, port: e.target.value })}
+                                            className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
+                                                ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
+                                                : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
+                                                }`}
+                                            placeholder="9002"
+                                        />
+                                    </div>
+                                </div>
 
-                        <div className="flex gap-3 mt-6">
-                            <button
-                                onClick={() => {
-                                    setShowEditModal(false);
-                                    setEditingEndpoint(null);
-                                }}
-                                className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}
-                            >
-                                {t('common.cancel')}
-                            </button>
-                            <button
-                                onClick={handleUpdate}
-                                className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
-                            >
-                                {t('common.update')}
-                            </button>
+                                <div>
+                                    <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                        {t('endpoint.secret_label')}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={newEndpoint.secret}
+                                        onChange={(e) => setNewEndpoint({ ...newEndpoint, secret: e.target.value })}
+                                        className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
+                                            ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
+                                            : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
+                                            }`}
+                                        placeholder={t('endpoint.secret_hint_placeholder')}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setShowAddModal(false)}
+                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}
+                                >
+                                    {t('common.cancel')}
+                                </button>
+                                <button
+                                    onClick={handleAdd}
+                                    className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
+                                >
+                                    {t('common.create')}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )
+                )
+            }
+
+            {/* 编辑节点模态框 */}
+            {
+                showEditModal && editingEndpoint && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className={`w-full max-w-md rounded-2xl p-6 ${isDark ? 'glass border border-white/10' : 'bg-white shadow-xl'}`}>
+                            <h2 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('endpoint.edit_modal_title')}</h2>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                        {t('endpoint.name_label')}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editingEndpoint.name}
+                                        onChange={(e) => setEditingEndpoint({ ...editingEndpoint, name: e.target.value })}
+                                        className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
+                                            ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
+                                            : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
+                                            }`}
+                                    />
+                                </div>
+
+                                {editingEndpoint.id === 'local' && (
+                                    <div>
+                                        <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                            {t('endpoint.host_ip_label')}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={editingEndpoint.host || ''}
+                                            onChange={(e) => setEditingEndpoint({ ...editingEndpoint, host: e.target.value })}
+                                            className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
+                                                ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
+                                                : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
+                                                }`}
+                                            placeholder="例如: 192.168.1.100"
+                                        />
+                                        <p className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                            {t('endpoint.host_ip_hint')}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {editingEndpoint.id !== 'local' && (
+                                    <>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="col-span-2">
+                                                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                    {t('endpoint.host_label')}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={editingEndpoint.host}
+                                                    onChange={(e) => setEditingEndpoint({ ...editingEndpoint, host: e.target.value })}
+                                                    className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
+                                                        ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
+                                                        : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
+                                                        }`}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                    {t('endpoint.port_label')}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={editingEndpoint.port}
+                                                    onChange={(e) => setEditingEndpoint({ ...editingEndpoint, port: e.target.value })}
+                                                    className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
+                                                        ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
+                                                        : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
+                                                        }`}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                {t('endpoint.secret_label')}
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={editingEndpoint.secret || ''}
+                                                onChange={(e) => setEditingEndpoint({ ...editingEndpoint, secret: e.target.value })}
+                                                className={`w-full px-4 py-2 rounded-lg outline-none transition-all ${isDark
+                                                    ? 'bg-black/20 border border-white/10 text-white focus:border-cyan-500'
+                                                    : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-cyan-500'
+                                                    }`}
+                                                placeholder={t('endpoint.secret_placeholder')}
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => {
+                                        setShowEditModal(false);
+                                        setEditingEndpoint(null);
+                                    }}
+                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}
+                                >
+                                    {t('common.cancel')}
+                                </button>
+                                <button
+                                    onClick={handleUpdate}
+                                    className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
+                                >
+                                    {t('common.update')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
             }
         </div >
     );
