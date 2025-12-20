@@ -7,3 +7,4 @@ build_log_2.txt
 validate_json.js
 .vscode
 Dockerfile.local
+data/
