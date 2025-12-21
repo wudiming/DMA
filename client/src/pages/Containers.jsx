@@ -723,22 +723,11 @@ function UnraidContainerCard({
       const windowHeight = window.innerHeight;
       const spaceBelow = windowHeight - rect.bottom;
 
-      // 如果下方空间小于 250px (菜单大概高度)，则向上显示
-      // Dark Mode 下用户偏好向上显示 (above the entry)
-      if (isDark) {
-        // 优先向上，除非上方空间不足
-        if (rect.top > 250) {
-          setMenuPosition('bottom');
-        } else {
-          setMenuPosition('top');
-        }
+      // 统一使用相同的定位逻辑 (优先向下，空间不足向上)
+      if (spaceBelow < 250) {
+        setMenuPosition('bottom');
       } else {
-        // Light Mode 保持原有逻辑 (优先向下)
-        if (spaceBelow < 250) {
-          setMenuPosition('bottom');
-        } else {
-          setMenuPosition('top');
-        }
+        setMenuPosition('top');
       }
     }
   }, [isMenuOpen]);
@@ -771,7 +760,7 @@ function UnraidContainerCard({
               }}
               className={`absolute left-full ml-2 w-56 ${isDark ? 'glass-menu-dark' : 'glass-menu-light'} rounded-lg overflow-hidden z-[100] animate-in fade-in slide-in-from-left-2 duration-200`}
             >
-              {hasWebUI && webUIUrl && (
+              {hasWebUI && webUIUrl && isRunning && (
                 <>
                   <UnraidMenuItem
                     icon={<ExternalLink className="w-4 h-4" />}
@@ -786,16 +775,17 @@ function UnraidContainerCard({
                 </>
               )}
 
-              <UnraidMenuItem
-                icon={<Terminal className="w-4 h-4" />}
-                label={t('container.shell')}
-                onClick={() => {
-                  handleShowTerminal(container);
-                  onIconClick(); // Close menu
-                }}
-                isDark={isDark}
-                disabled={!isRunning}
-              />
+              {isRunning && (
+                <UnraidMenuItem
+                  icon={<Terminal className="w-4 h-4" />}
+                  label={t('container.shell')}
+                  onClick={() => {
+                    handleShowTerminal(container);
+                    onIconClick(); // Close menu
+                  }}
+                  isDark={isDark}
+                />
+              )}
 
               {!isStack && (
                 <>
