@@ -733,7 +733,7 @@ function UnraidContainerCard({
   }, [isMenuOpen]);
 
   return (
-    <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-lg p-4 border transition-all hover:shadow-lg relative`}>
+    <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-lg p-4 border transition-all hover:shadow-lg relative ${isMenuOpen ? 'z-20' : ''}`}>
       <div className="flex items-start gap-4">
         {/* Unraid风格：左侧大图标 + 点击菜单 */}
         <div className="relative flex-shrink-0">
