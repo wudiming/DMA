@@ -1423,7 +1423,7 @@ app.delete('/api/images/:id', async (req, res) => {
 app.post('/api/images/prune', async (req, res) => {
   try {
     const dockerInstance = getCurrentDocker(req);
-    const report = await dockerInstance.pruneImages({ filters: { dangling: ['false'] } });
+    const report = await dockerInstance.pruneImages({ filters: { dangling: ['true'] } });
     res.json(report);
   } catch (error) {
     res.status(500).json({ error: error.message });
