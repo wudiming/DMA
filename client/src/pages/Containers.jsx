@@ -77,7 +77,11 @@ export default function Containers() {
   useEffect(() => {
     setContainers([]); // Clear previous data
     fetchContainers();
-    const interval = setInterval(fetchContainers, 3000);
+    fetchImages(); // Fetch images to resolve names
+    const interval = setInterval(() => {
+      fetchContainers();
+      fetchImages(); // Keep images in sync
+    }, 3000);
     return () => clearInterval(interval);
   }, [currentEndpoint]);
 
@@ -540,6 +544,7 @@ export default function Containers() {
                 handleShowLogs={handleShowLogs}
                 handleShowUpdate={handleShowUpdate}
                 handleShowTerminal={handleShowTerminal}
+                images={images} // Pass images to card
 
                 checkUpdate={() => checkSingleUpdate(container.Id)}
                 updateContainer={() => updateSingleContainer(container.Id)}
@@ -639,6 +644,7 @@ function UnraidContainerCard({
   handleShowLogs,
   handleShowUpdate,
   handleShowTerminal,
+  images, // Receive images prop
 
   checkUpdate,
   updateContainer,
@@ -658,7 +664,15 @@ function UnraidContainerCard({
   };
 
   const containerName = container.Names[0]?.replace(/^\//, '') || container.Id.substring(0, 12);
-  const imageName = container.Image;
+
+  // Resolve image name
+  let imageName = container.Image;
+  if (imageName.startsWith('sha256:') && images) {
+    const foundImage = images.find(img => img.Id === imageName);
+    if (foundImage && foundImage.RepoTags && foundImage.RepoTags.length > 0) {
+      imageName = foundImage.RepoTags[0];
+    }
+  }
 
   // 网络信息
   const networks = Object.keys(container.NetworkSettings?.Networks || {});

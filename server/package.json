@@ -1,6 +1,6 @@
 {
   "name": "dma-server",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Docker Manager App - Backend Server",
   "main": "index.js",
   "type": "module",
