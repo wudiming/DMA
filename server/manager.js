@@ -1423,7 +1423,40 @@ app.delete('/api/images/:id', async (req, res) => {
 app.post('/api/images/prune', async (req, res) => {
   try {
     const dockerInstance = getCurrentDocker(req);
-    const report = await dockerInstance.pruneImages({ filters: { dangling: ['true'] } });
+
+    // 1. 获取所有容器正在使用的镜像 ID
+    const containers = await dockerInstance.listContainers({ all: true });
+    const usedImageIds = new Set(containers.map(c => c.ImageID));
+
+    // 2. 获取所有本地镜像
+    const images = await dockerInstance.listImages();
+
+    // 3. 找出未使用的镜像
+    const unusedImages = images.filter(img => !usedImageIds.has(img.Id));
+
+    const report = {
+      ImagesDeleted: [],
+      SpaceReclaimed: 0
+    };
+
+    // 4. 删除未使用的镜像
+    for (const img of unusedImages) {
+      try {
+        const image = dockerInstance.getImage(img.Id);
+        await image.remove({ force: true });
+
+        // 记录删除结果
+        if (img.RepoTags && img.RepoTags.length > 0) {
+          report.ImagesDeleted.push(...img.RepoTags.map(tag => ({ Untagged: tag })));
+        }
+        report.ImagesDeleted.push({ Deleted: img.Id });
+        report.SpaceReclaimed += img.Size;
+      } catch (err) {
+        console.warn(`Failed to remove unused image ${img.Id.substring(0, 12)}:`, err.message);
+        // 忽略删除失败（可能是父镜像被依赖等情况）
+      }
+    }
+
     res.json(report);
   } catch (error) {
     res.status(500).json({ error: error.message });
