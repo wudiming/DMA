@@ -920,7 +920,14 @@ function UnraidContainerCard({
               </div>
             )}
             {updateStatus === 'latest' && (
-              <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs ${isDark ? 'bg-green-500/10 text-green-400' : 'bg-green-50 text-green-600'}`}>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  checkUpdate();
+                }}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs cursor-pointer transition-colors ${isDark ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                title="点击重新检查更新"
+              >
                 <CheckCircle2 className="w-3 h-3" />
                 <span>{t('container.up_to_date')}</span>
               </div>
