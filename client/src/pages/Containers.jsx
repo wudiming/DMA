@@ -60,6 +60,7 @@ export default function Containers() {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [updateContainer, setUpdateContainer] = useState(null);
   const [updateStatus, setUpdateStatus] = useState(new Map());
+  const [updateErrors, setUpdateErrors] = useState(new Map());
   const [containerStats, setContainerStats] = useState(new Map());
   const [clickedContainer, setClickedContainer] = useState(null);
   const [menuRef] = useState(useRef(null));
@@ -156,8 +157,18 @@ export default function Containers() {
       // 优先使用后端返回的 status 字段
       const status = response.data.status || (response.data.hasUpdate ? 'available' : 'latest');
       setUpdateStatus(prev => new Map(prev).set(containerId, status));
+      if (response.data.error) {
+        setUpdateErrors(prev => new Map(prev).set(containerId, response.data.error));
+      } else {
+        setUpdateErrors(prev => {
+          const next = new Map(prev);
+          next.delete(containerId);
+          return next;
+        });
+      }
     } catch (error) {
       setUpdateStatus(prev => new Map(prev).set(containerId, 'error'));
+      setUpdateErrors(prev => new Map(prev).set(containerId, error.message));
     }
   };
 
@@ -538,6 +549,7 @@ export default function Containers() {
                 isDark={isDark}
                 stats={containerStats.get(container.Id)}
                 updateStatus={updateStatus.get(container.Id)}
+                updateError={updateErrors.get(container.Id)}
                 isMenuOpen={clickedContainer === container.Id}
                 onIconClick={() => handleIconClick(container.Id)}
                 handleAction={handleAction}
@@ -638,6 +650,7 @@ function UnraidContainerCard({
   isDark,
   stats,
   updateStatus,
+  updateError,
   isMenuOpen,
   onIconClick,
   handleAction,
@@ -670,7 +683,9 @@ function UnraidContainerCard({
   if (imageName.startsWith('sha256:') && images) {
     const foundImage = images.find(img => img.Id === imageName);
     if (foundImage && foundImage.RepoTags && foundImage.RepoTags.length > 0) {
-      imageName = foundImage.RepoTags[0];
+      // Prefer 'latest' tag if available
+      const latestTag = foundImage.RepoTags.find(tag => tag.endsWith(':latest'));
+      imageName = latestTag || foundImage.RepoTags[0];
     }
   }
 
@@ -963,7 +978,7 @@ function UnraidContainerCard({
                   checkUpdate();
                 }}
                 className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs cursor-pointer transition-colors ${isDark ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
-                title="检查失败，点击重试"
+                title={updateError || "检查失败，点击重试"}
               >
                 <AlertTriangle className="w-3 h-3" />
                 <span>失败 (点击重试)</span>

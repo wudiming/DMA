@@ -662,15 +662,22 @@ app.get('/api/containers', async (req, res) => {
 });
 
 // 检查更新的辅助函数
+// 检查更新的辅助函数
 async function checkContainerUpdate(dockerInstance, containerId) {
   try {
     const container = dockerInstance.getContainer(containerId);
     const containerInfo = await container.inspect();
     const currentImage = containerInfo.Config.Image;
+    const imageId = containerInfo.Image; // Use Image ID for local inspection
 
     try {
-      // 获取本地镜像信息
-      const localImage = await dockerInstance.getImage(currentImage).inspect();
+      // 获取本地镜像信息 - Use ID to avoid "not found" if tag is pruned
+      const localImage = await dockerInstance.getImage(imageId).inspect();
+
+      // Check if currentImage is a valid repo tag (not a hash) before checking remote
+      if (currentImage.startsWith('sha256:')) {
+        return { hasUpdate: false, status: 'local', error: 'Image is identified by hash, cannot check for updates' };
+      }
 
       // 获取远程仓库信息
       const distribution = await dockerInstance.getImage(currentImage).distribution();
