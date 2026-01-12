@@ -826,7 +826,7 @@ app.post('/api/containers/:id/restart-policy', async (req, res) => {
 });
 
 app.post('/api/containers/create', async (req, res) => {
-  const { name, image, env, ports, volumes, restart, labels, network } = req.body;
+  const { name, image, env, ports, volumes, restart, labels, network, entrypoint, cmd, capAdd, devices, sysctls } = req.body;
 
   // 设置响应头支持流式输出
   res.setHeader('Content-Type', 'application/x-ndjson');
@@ -980,8 +980,13 @@ app.post('/api/containers/create', async (req, res) => {
         PortBindings: {},
         Binds: volumes || [],
         RestartPolicy: { Name: restart || 'no' },
-        NetworkMode: network || 'bridge'
-      }
+        NetworkMode: network || 'bridge',
+        CapAdd: capAdd || [],
+        Devices: devices || [],
+        Sysctls: sysctls || {}
+      },
+      Entrypoint: entrypoint,
+      Cmd: cmd
     };
 
     if (ports && ports.length > 0) {
@@ -1003,6 +1008,14 @@ app.post('/api/containers/create', async (req, res) => {
     if (volumes) volumes.forEach(v => runCommand += ` -v ${v}`);
     if (env) env.forEach(e => runCommand += ` -e "${e}"`);
     if (labels) Object.entries(labels).forEach(([k, v]) => runCommand += ` -l "${k}=${v}"`);
+    if (entrypoint) runCommand += ` --entrypoint "${entrypoint}"`;
+    if (capAdd) capAdd.forEach(c => runCommand += ` --cap-add ${c}`);
+    if (devices) devices.forEach(d => runCommand += ` --device ${d.PathOnHost}:${d.PathInContainer}:${d.CgroupPermissions}`);
+    if (sysctls) Object.entries(sysctls).forEach(([k, v]) => runCommand += ` --sysctl ${k}=${v}`);
+    if (cmd) {
+      if (Array.isArray(cmd)) runCommand += ` ${cmd.join(' ')}`;
+      else runCommand += ` ${cmd}`;
+    }
     runCommand += ` ${image}`;
 
     sendEvent('step', '执行命令');
@@ -3037,33 +3050,16 @@ app.post('/api/stacks/:name/deploy', async (req, res) => {
       }
 
       if (shouldPull) {
-        // Smart Tagging Phase 1: Pre-pull Backup
+        // Smart Tagging Logic
+        let oldImageId = null;
+        let oldImageInfo = null;
+
         try {
           const oldImage = dockerInstance.getImage(imageName);
-          const oldImageInfo = await oldImage.inspect();
-
-          const version = extractImageVersion(oldImageInfo);
-
-          const repo = imageName.split(':')[0];
-          const currentTag = imageName.split(':')[1] || 'latest';
-          let backupTag;
-
-          if (version && version !== currentTag) {
-            backupTag = version;
-          } else {
-            const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-            backupTag = `${currentTag}-${timestamp}`;
-          }
-
-          const fullBackupTag = `${repo}:${backupTag}`;
-
-          console.log(`[Stack Smart Tagging] Backing up ${imageName} to ${fullBackupTag}`);
-          sendEvent('info', `正在备份旧镜像为: ${fullBackupTag}`);
-
-          await oldImage.tag({ repo: repo, tag: backupTag });
-
+          oldImageInfo = await oldImage.inspect();
+          oldImageId = oldImageInfo.Id;
         } catch (e) {
-          // Ignore
+          // Image doesn't exist, no need to backup
         }
 
         sendEvent('pull-start', `开始拉取新镜像: ${imageName}`);
@@ -3087,25 +3083,63 @@ app.post('/api/stacks/:name/deploy', async (req, res) => {
           });
           sendEvent('success', '镜像拉取完成');
 
-          // Smart Tagging Phase 2: Post-pull New Image Tagging
+          // Check if image actually changed
           try {
             const newImage = dockerInstance.getImage(imageName);
             const newImageInfo = await newImage.inspect();
-            const newVersion = extractImageVersion(newImageInfo);
+            const newImageId = newImageInfo.Id;
 
+            // Only backup if ID changed and we had an old image
+            if (oldImageId && oldImageId !== newImageId) {
+              console.log(`[Stack Smart Tagging] Image changed (${oldImageId.substring(0, 12)} -> ${newImageId.substring(0, 12)}). Creating backup.`);
+
+              const version = extractImageVersion(oldImageInfo);
+              const repo = imageName.split(':')[0];
+              const currentTag = imageName.split(':')[1] || 'latest';
+              let backupTag;
+
+              if (version && version !== currentTag) {
+                backupTag = version;
+              } else {
+                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                backupTag = `${currentTag}-${timestamp}`;
+              }
+
+              const fullBackupTag = `${repo}:${backupTag}`;
+
+              try {
+                // Tag the OLD image ID
+                const oldImageObj = dockerInstance.getImage(oldImageId);
+                await oldImageObj.tag({ repo: repo, tag: backupTag });
+                console.log(`[Stack Smart Tagging] Backed up old image to ${fullBackupTag}`);
+                sendEvent('info', `旧镜像已备份为: ${fullBackupTag}`);
+              } catch (tagErr) {
+                console.warn(`[Stack Smart Tagging] Failed to backup old image:`, tagErr.message);
+              }
+            } else {
+              console.log(`[Stack Smart Tagging] Image did not change or was new. No backup needed.`);
+            }
+
+            // Smart Tagging Phase 2: Post-pull New Image Tagging (Version Tagging)
+            const newVersion = extractImageVersion(newImageInfo);
             if (newVersion) {
               const repo = imageName.split(':')[0];
               const currentTag = imageName.split(':')[1] || 'latest';
 
               if (newVersion !== currentTag) {
                 const fullNewVersionTag = `${repo}:${newVersion}`;
+                // Check if this tag already exists to avoid redundant tagging logs
+                const repoDigests = newImageInfo.RepoDigests || [];
+                // This check is hard because RepoDigests has digests, RepoTags has tags.
+                // Let's just try to tag, it's cheap.
+
                 console.log(`[Stack Smart Tagging] Tagging new image ${imageName} as ${fullNewVersionTag}`);
                 sendEvent('info', `为新镜像添加版本标签: ${fullNewVersionTag}`);
                 await newImage.tag({ repo: repo, tag: newVersion });
               }
             }
           } catch (e) {
-            console.warn('[Stack Smart Tagging] Failed to tag new image:', e.message);
+            console.warn('[Stack Smart Tagging] Failed to process tags after pull:', e.message);
           }
 
         } catch (pullError) {

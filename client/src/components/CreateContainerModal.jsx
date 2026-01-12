@@ -20,7 +20,12 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
         env: [], // 默认为空，不显示输入框
         restart: 'always', // 默认总是重启
         network: 'bridge',
-        alwaysPull: false
+        alwaysPull: false,
+        entrypoint: '',
+        cmd: '',
+        capAdd: [],
+        devices: [],
+        sysctls: []
     });
     const [showIconInput, setShowIconInput] = useState(false);
     const [showWebUiInput, setShowWebUiInput] = useState(false);
@@ -29,6 +34,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
     const [selectedTemplate, setSelectedTemplate] = useState('');
     const [saveAsTemplate, setSaveAsTemplate] = useState(false);
     const [templateName, setTemplateName] = useState('');
+    const [activeTab, setActiveTab] = useState('general'); // general, network, storage, env, advanced
 
     const isEdit = !!initialData && !!initialData.containerId;
 
@@ -64,12 +70,36 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 env: initialData.env || [],
                 restart: initialData.restart || 'always',
                 network: initialData.network || 'bridge',
-                alwaysPull: false
+                alwaysPull: false,
+                entrypoint: initialData.entrypoint || '',
+                cmd: initialData.cmd || '',
+                capAdd: initialData.capAdd || [],
+                devices: initialData.devices || [],
+                sysctls: initialData.sysctls || []
             });
             if (initialData.iconUrl) setShowIconInput(true);
             if (initialData.webUi) setShowWebUiInput(true);
         }
     }, [initialData]);
+
+    // Auto-fill WebUI when ports change or when adding WebUI
+    useEffect(() => {
+        if (!formData.webUi && showWebUiInput) {
+            const host = currentEndpoint ? (currentEndpoint.ip || 'localhost') : 'localhost';
+            // Try to find a port
+            let port = '';
+            if (formData.ports.length > 0) {
+                const firstPort = formData.ports[0];
+                if (firstPort && firstPort.includes(':')) {
+                    const hostPort = firstPort.split(':')[0];
+                    if (!isNaN(hostPort)) {
+                        port = hostPort;
+                    }
+                }
+            }
+            setFormData(prev => ({ ...prev, webUi: `${host}:${port}` }));
+        }
+    }, [showWebUiInput, currentEndpoint]); // Trigger when input is shown
 
     const fetchTemplates = async () => {
         try {
@@ -158,7 +188,12 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 volumes: [],
                 env: [],
                 restart: 'always',
-                network: 'bridge'
+                network: 'bridge',
+                entrypoint: '',
+                cmd: '',
+                capAdd: [],
+                devices: [],
+                sysctls: []
             };
 
             for (let i = 0; i < args.length; i++) {
@@ -175,9 +210,33 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                     newData.restart = args[++i];
                 } else if (arg === '--net' || arg === '--network') {
                     newData.network = args[++i];
-                } else if (!arg.startsWith('-') && i === args.length - 1) {
-                    // 最后一个参数通常是镜像
-                    newData.image = arg;
+                } else if (arg === '--entrypoint') {
+                    newData.entrypoint = args[++i];
+                } else if (arg === '--cap-add') {
+                    newData.capAdd.push(args[++i]);
+                } else if (arg === '--device') {
+                    const device = args[++i];
+                    const [pathOnHost, pathInContainer, cgroupPermissions] = device.split(':');
+                    newData.devices.push({
+                        PathOnHost: pathOnHost,
+                        PathInContainer: pathInContainer || pathOnHost,
+                        CgroupPermissions: cgroupPermissions || 'rwm'
+                    });
+                } else if (arg === '--sysctl') {
+                    const [key, value] = args[++i].split('=');
+                    newData.sysctls.push({ key, value });
+                } else if (!arg.startsWith('-')) {
+                    if (!newData.image) {
+                        // First non-flag argument is image
+                        newData.image = arg;
+                    } else {
+                        // Subsequent non-flag arguments are command
+                        // If cmd is empty, start it. If not, append.
+                        // Note: This is a simplification. Docker run [OPTIONS] IMAGE [COMMAND] [ARG...]
+                        // We treat everything after image as command.
+                        if (newData.cmd) newData.cmd += ' ' + arg;
+                        else newData.cmd = arg;
+                    }
                 }
             }
 
@@ -395,7 +454,15 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 restart: formData.restart,
                 network: formData.network,
                 labels: labels,
-                alwaysPull: formData.alwaysPull
+                alwaysPull: formData.alwaysPull,
+                entrypoint: formData.entrypoint && formData.entrypoint.trim() ? formData.entrypoint.trim().split(' ') : undefined, // Split by space for array
+                cmd: formData.cmd && formData.cmd.trim() ? formData.cmd.trim().split(' ') : undefined,
+                capAdd: formData.capAdd.filter(c => c.trim()),
+                devices: formData.devices.filter(d => d.PathOnHost && d.PathInContainer),
+                sysctls: formData.sysctls.reduce((acc, curr) => {
+                    if (curr.key && curr.value) acc[curr.key] = curr.value;
+                    return acc;
+                }, {})
             };
 
             // 自动保存为模板
@@ -521,7 +588,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-4xl border shadow-2xl flex flex-col max-h-[85vh]`}>
+            <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-4xl border shadow-2xl flex flex-col h-[85vh]`}>
                 {/* Header */}
                 <div className={`flex items-center justify-between p-6 border-b flex-shrink-0 ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
                     <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -631,338 +698,536 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                             className={`w-full h-40 p-4 rounded-lg font-mono text-sm ${isDark ? 'bg-black/30 text-white' : 'bg-white border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                                         />
                                     </div>
-                                    <div className="flex justify-end">
-                                        <button
-                                            onClick={parseDockerCommand}
-                                            disabled={!command.trim()}
-                                            className="px-6 py-2 rounded-lg font-medium bg-cyan-500 text-white hover:bg-cyan-600 disabled:opacity-50 flex items-center gap-2"
-                                        >
-                                            <ArrowRight className="w-4 h-4" />
-                                            {t('container.parse_command')}
-                                        </button>
-                                    </div>
+                                    {/* Buttons moved to footer */}
                                 </div>
                             ) : (
-                                <form id="create-container-form" onSubmit={handleSubmit} className="p-6 space-y-6">
-                                    {/* 模板选择 */}
-                                    {!isEdit && (
-                                        <div className={`px-4 py-3 rounded-lg border flex items-center gap-3 ${isDark ? 'bg-white/5 border-white/10' : 'bg-blue-50/50 border-blue-100'}`}>
-                                            <label className={`block text-sm font-medium whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                {t('container.template_select')}
-                                            </label>
-                                            <select
-                                                value={selectedTemplate}
-                                                onChange={handleTemplateSelect}
-                                                className={`flex-1 px-3 py-1.5 text-sm rounded-md ${isDark ? 'glass text-white' : 'bg-white border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                <form id="create-container-form" onSubmit={handleSubmit} className="h-full flex flex-col">
+                                    <div className={`flex border-b ${isDark ? 'border-white/10' : 'border-gray-200'} px-6`}>
+                                        {['general', 'network', 'storage', 'env', 'advanced'].map(tab => (
+                                            <button
+                                                key={tab}
+                                                type="button"
+                                                onClick={() => setActiveTab(tab)}
+                                                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
+                                                    ? 'border-cyan-500 text-cyan-500'
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                                    }`}
                                             >
-                                                <option value="">{t('container.no_template')}</option>
-                                                {templates.map(t => (
-                                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                                ))}
-                                            </select>
-                                            {selectedTemplate && (
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => handleDeleteTemplate(selectedTemplate, e)}
-                                                    className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                                    title={t('common.delete')}
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
+                                                {t(`container.tab_${tab}`) || tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                            </button>
+                                        ))}
+                                    </div>
 
-                                    {/* 基本信息 */}
-                                    <div className="space-y-4">
-                                        <h3 className={`text-sm font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                            {t('container.basic_info')}
-                                        </h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    {t('container.container_name')} *
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.name}
-                                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                    placeholder="my-container"
-                                                    className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    {t('container.image_label')} *
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.image}
-                                                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                                                    placeholder="nginx:latest"
-                                                    className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* 可选配置：图标与 Web UI */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {/* 图标 URL */}
-                                            <div>
-                                                <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    {t('container.icon_url')}
-                                                </label>
-                                                {!showIconInput ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowIconInput(true)}
-                                                        className={`text-sm flex items-center gap-1 ${isDark ? 'text-cyan-400' : 'text-cyan-600'} hover:underline`}
-                                                    >
-                                                        <Plus className="w-3 h-3" />
-                                                        {t('container.add_icon')}
-                                                    </button>
-                                                ) : (
-                                                    <div className="flex gap-3">
-                                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isDark ? 'bg-white/5' : 'bg-gray-100'} overflow-hidden border ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
-                                                            <img key={formData.iconUrl} src={formData.iconUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />
-                                                        </div>
-                                                        <div className="flex-1 flex gap-2">
-                                                            <input
-                                                                type="text"
-                                                                value={formData.iconUrl}
-                                                                onChange={(e) => setFormData({ ...formData, iconUrl: e.target.value })}
-                                                                placeholder="https://example.com/icon.png"
-                                                                className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                                                            />
+                                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                                        {/* General Tab */}
+                                        {activeTab === 'general' && (
+                                            <div className="space-y-6">
+                                                {/* Template Select */}
+                                                {!isEdit && (
+                                                    <div className={`px-4 py-3 rounded-lg border flex items-center gap-3 ${isDark ? 'bg-white/5 border-white/10' : 'bg-blue-50/50 border-blue-100'}`}>
+                                                        <label className={`block text-sm font-medium whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.template_select')}
+                                                        </label>
+                                                        <select
+                                                            value={selectedTemplate}
+                                                            onChange={handleTemplateSelect}
+                                                            className={`flex-1 px-3 py-1.5 text-sm rounded-md ${isDark ? 'glass text-white' : 'bg-white border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                        >
+                                                            <option value="">{t('container.no_template')}</option>
+                                                            {templates.map(t => (
+                                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        {selectedTemplate && (
                                                             <button
                                                                 type="button"
-                                                                onClick={() => {
-                                                                    setFormData({ ...formData, iconUrl: '' });
-                                                                    setShowIconInput(false);
-                                                                }}
-                                                                className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-100 text-red-600'}`}
+                                                                onClick={(e) => handleDeleteTemplate(selectedTemplate, e)}
+                                                                className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                                                title={t('common.delete')}
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
                                                             </button>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.container_name')} *
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={formData.name}
+                                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                            placeholder="my-container"
+                                                            className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.image_label')} *
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={formData.image}
+                                                            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                                                            placeholder="nginx:latest"
+                                                            className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Icon & WebUI */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                                {t('container.icon_url')}
+                                                            </label>
+                                                            {!showIconInput && !formData.iconUrl && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowIconInput(true)}
+                                                                    className="text-sm text-cyan-500 hover:text-cyan-400 font-medium px-3 py-1 bg-cyan-500/10 rounded-full transition-colors"
+                                                                >
+                                                                    + {t('common.add')}
+                                                                </button>
+                                                            )}
                                                         </div>
+                                                        {(showIconInput || formData.iconUrl) && (
+                                                            <div className="flex gap-2">
+                                                                <div className="relative flex-1">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={formData.iconUrl}
+                                                                        onChange={(e) => setFormData({ ...formData, iconUrl: e.target.value })}
+                                                                        placeholder="https://example.com/icon.png"
+                                                                        className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setFormData({ ...formData, iconUrl: '' });
+                                                                            setShowIconInput(false);
+                                                                        }}
+                                                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                                                    >
+                                                                        <X className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                                {formData.iconUrl && (
+                                                                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/10 flex-shrink-0 border border-white/10">
+                                                                        <img src={formData.iconUrl} alt="" className="w-full h-full object-cover" onError={(e) => e.target.style.display = 'none'} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-1.5">
+                                                            <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                                {t('container.webui_url')}
+                                                            </label>
+                                                            {!showWebUiInput && !formData.webUi && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowWebUiInput(true)}
+                                                                    className="text-sm text-cyan-500 hover:text-cyan-400 font-medium px-3 py-1 bg-cyan-500/10 rounded-full transition-colors"
+                                                                >
+                                                                    + {t('common.add')}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        {(showWebUiInput || formData.webUi) && (
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.webUi}
+                                                                    onChange={(e) => setFormData({ ...formData, webUi: e.target.value })}
+                                                                    placeholder="127.0.0.1:8080"
+                                                                    className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setFormData({ ...formData, webUi: '' });
+                                                                        setShowWebUiInput(false);
+                                                                    }}
+                                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                                                >
+                                                                    <X className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
 
-                                            {/* Web UI 地址 */}
-                                            <div>
-                                                <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    {t('container.webui_url')}
-                                                </label>
-                                                {!showWebUiInput ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setShowWebUiInput(true);
-                                                            // Auto-fill IP
-                                                            const currentEp = endpoints.find(e => e.id === currentEndpoint);
-                                                            let host = window.location.hostname;
-                                                            if (currentEp) {
-                                                                if (currentEp.url) {
-                                                                    const match = currentEp.url.match(/:\/\/(.[^:]+)/);
-                                                                    if (match) host = match[1];
-                                                                } else if (currentEp.host) {
-                                                                    host = currentEp.host;
-                                                                }
-                                                            }
-                                                            if (host === 'localhost') host = '127.0.0.1';
-                                                            setFormData({ ...formData, webUi: `${host}:` });
-                                                        }}
-                                                        className={`text-sm flex items-center gap-1 ${isDark ? 'text-cyan-400' : 'text-cyan-600'} hover:underline`}
+                                                <div className="mb-4">
+                                                    <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                        {t('container.restart_policy')}
+                                                    </label>
+                                                    <select
+                                                        value={formData.restart}
+                                                        onChange={(e) => setFormData({ ...formData, restart: e.target.value })}
+                                                        className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                                                     >
-                                                        <Plus className="w-3 h-3" />
-                                                        {t('container.add_webui')}
-                                                    </button>
-                                                ) : (
-                                                    <div className="flex gap-2">
+                                                        <option value="no">{t('common.restart_no')}</option>
+                                                        <option value="always">{t('common.restart_always')}</option>
+                                                        <option value="on-failure">{t('common.restart_on_failure')}</option>
+                                                        <option value="unless-stopped">{t('common.restart_unless_stopped')}</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Network Tab */}
+                                        {activeTab === 'network' && (
+                                            <div className="space-y-6">
+                                                <div>
+                                                    <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                        {t('container.network_mode')}
+                                                    </label>
+                                                    <select
+                                                        value={formData.network}
+                                                        onChange={(e) => setFormData({ ...formData, network: e.target.value })}
+                                                        className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                    >
+                                                        <option value="bridge">{t('common.network_bridge')}</option>
+                                                        <option value="host">{t('common.network_host')}</option>
+                                                        <option value="none">{t('common.network_none')}</option>
+                                                        <option value="custom">{t('common.network_custom')}</option>
+                                                    </select>
+                                                    {formData.network === 'custom' && (
                                                         <input
                                                             type="text"
-                                                            value={formData.webUi}
-                                                            onChange={(e) => setFormData({ ...formData, webUi: e.target.value })}
-                                                            placeholder="127.0.0.1:8080"
-                                                            className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                            value={formData.network}
+                                                            onChange={(e) => setFormData({ ...formData, network: e.target.value })}
+                                                            placeholder="custom_network"
+                                                            className={`mt-2 w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                                                         />
+                                                    )}
+                                                </div>
+
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <label className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.ports')}
+                                                        </label>
                                                         <button
                                                             type="button"
-                                                            onClick={() => {
-                                                                setFormData({ ...formData, webUi: '' });
-                                                                setShowWebUiInput(false);
-                                                            }}
-                                                            className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-100 text-red-600'}`}
+                                                            onClick={() => addField('ports')}
+                                                            className="text-sm text-cyan-500 hover:text-cyan-400 font-medium px-3 py-1 bg-cyan-500/10 rounded-full transition-colors"
                                                         >
-                                                            <Trash2 className="w-4 h-4" />
+                                                            + {t('common.add')}
                                                         </button>
                                                     </div>
-                                                )}
+                                                    <div className="space-y-2">
+                                                        {formData.ports.map((port, index) => (
+                                                            <div key={index} className="flex gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={port}
+                                                                    onChange={(e) => updateField('ports', index, e.target.value)}
+                                                                    placeholder="8080:80"
+                                                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeField('ports', index)}
+                                                                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        {formData.ports.length === 0 && (
+                                                            <div className={`text-sm text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                                {t('container.no_ports')}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
+
+                                        {/* Storage Tab */}
+                                        {activeTab === 'storage' && (
+                                            <div className="space-y-6">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <label className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.volumes')}
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => addField('volumes')}
+                                                            className="text-sm text-cyan-500 hover:text-cyan-400 font-medium px-3 py-1 bg-cyan-500/10 rounded-full transition-colors"
+                                                        >
+                                                            + {t('common.add')}
+                                                        </button>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {formData.volumes.map((vol, index) => (
+                                                            <div key={index} className="flex gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={vol}
+                                                                    onChange={(e) => updateField('volumes', index, e.target.value)}
+                                                                    placeholder="/host/path:/container/path"
+                                                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeField('volumes', index)}
+                                                                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    {formData.volumes.length === 0 && (
+                                                        <div className={`text-sm text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                            {t('container.no_volumes')}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                            </div>
+                                        )}
+
+                                        {/* Environment Tab */}
+                                        {activeTab === 'env' && (
+                                            <div className="space-y-6">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <label className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.env_vars')}
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => addField('env')}
+                                                            className="text-sm text-cyan-500 hover:text-cyan-400 font-medium px-3 py-1 bg-cyan-500/10 rounded-full transition-colors"
+                                                        >
+                                                            + {t('common.add')}
+                                                        </button>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {formData.env.map((env, index) => (
+                                                            <div key={index} className="flex gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={env}
+                                                                    onChange={(e) => updateField('env', index, e.target.value)}
+                                                                    placeholder="KEY=VALUE"
+                                                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeField('env', index)}
+                                                                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        {formData.env.length === 0 && (
+                                                            <div className={`text-sm text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                                {t('container.no_env')}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Advanced Tab */}
+                                        {activeTab === 'advanced' && (
+                                            <div className="space-y-6">
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.entrypoint')}
+                                                        </label>
+                                                        <textarea
+                                                            value={formData.entrypoint}
+                                                            onChange={(e) => setFormData({ ...formData, entrypoint: e.target.value })}
+                                                            placeholder="/bin/sh -c"
+                                                            rows={2}
+                                                            className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.command')}
+                                                        </label>
+                                                        <textarea
+                                                            value={formData.cmd}
+                                                            onChange={(e) => setFormData({ ...formData, cmd: e.target.value })}
+                                                            placeholder="npm start"
+                                                            rows={2}
+                                                            className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Capabilities */}
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <label className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.capabilities')}
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFormData(prev => ({ ...prev, capAdd: [...prev.capAdd, ''] }))}
+                                                            className="text-sm text-cyan-500 hover:text-cyan-400 font-medium px-3 py-1 bg-cyan-500/10 rounded-full transition-colors"
+                                                        >
+                                                            + {t('common.add')}
+                                                        </button>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {formData.capAdd.map((cap, index) => (
+                                                            <div key={index} className="flex gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={cap}
+                                                                    onChange={(e) => {
+                                                                        const newCaps = [...formData.capAdd];
+                                                                        newCaps[index] = e.target.value;
+                                                                        setFormData({ ...formData, capAdd: newCaps });
+                                                                    }}
+                                                                    placeholder="NET_ADMIN"
+                                                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newCaps = formData.capAdd.filter((_, i) => i !== index);
+                                                                        setFormData({ ...formData, capAdd: newCaps });
+                                                                    }}
+                                                                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Devices */}
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <label className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.devices')}
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFormData(prev => ({ ...prev, devices: [...prev.devices, { PathOnHost: '', PathInContainer: '', CgroupPermissions: 'rwm' }] }))}
+                                                            className="text-sm text-cyan-500 hover:text-cyan-400 font-medium px-3 py-1 bg-cyan-500/10 rounded-full transition-colors"
+                                                        >
+                                                            + {t('common.add')}
+                                                        </button>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {formData.devices.map((device, index) => (
+                                                            <div key={index} className="flex gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={device.PathOnHost}
+                                                                    onChange={(e) => {
+                                                                        const newDevices = [...formData.devices];
+                                                                        newDevices[index].PathOnHost = e.target.value;
+                                                                        setFormData({ ...formData, devices: newDevices });
+                                                                    }}
+                                                                    placeholder="Host Path (/dev/net/tun)"
+                                                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={device.PathInContainer}
+                                                                    onChange={(e) => {
+                                                                        const newDevices = [...formData.devices];
+                                                                        newDevices[index].PathInContainer = e.target.value;
+                                                                        setFormData({ ...formData, devices: newDevices });
+                                                                    }}
+                                                                    placeholder="Container Path"
+                                                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newDevices = formData.devices.filter((_, i) => i !== index);
+                                                                        setFormData({ ...formData, devices: newDevices });
+                                                                    }}
+                                                                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Sysctls */}
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <label className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {t('container.sysctls')}
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFormData(prev => ({ ...prev, sysctls: [...prev.sysctls, { key: '', value: '' }] }))}
+                                                            className="text-sm text-cyan-500 hover:text-cyan-400 font-medium px-3 py-1 bg-cyan-500/10 rounded-full transition-colors"
+                                                        >
+                                                            + {t('common.add')}
+                                                        </button>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        {formData.sysctls.map((sysctl, index) => (
+                                                            <div key={index} className="flex gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={sysctl.key}
+                                                                    onChange={(e) => {
+                                                                        const newSysctls = [...formData.sysctls];
+                                                                        newSysctls[index].key = e.target.value;
+                                                                        setFormData({ ...formData, sysctls: newSysctls });
+                                                                    }}
+                                                                    placeholder="net.ipv4.ip_forward"
+                                                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={sysctl.value}
+                                                                    onChange={(e) => {
+                                                                        const newSysctls = [...formData.sysctls];
+                                                                        newSysctls[index].value = e.target.value;
+                                                                        setFormData({ ...formData, sysctls: newSysctls });
+                                                                    }}
+                                                                    placeholder="1"
+                                                                    className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newSysctls = formData.sysctls.filter((_, i) => i !== index);
+                                                                        setFormData({ ...formData, sysctls: newSysctls });
+                                                                    }}
+                                                                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    <div className={`h-px ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-
-                                    {/* 高级配置 */}
-                                    <div className="space-y-6">
-                                        {/* 端口映射 */}
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    {t('container.port_mapping')}
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => addField('ports')}
-                                                    className={`text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors ${isDark ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'}`}
-                                                >
-                                                    <Plus className="w-3 h-3" />
-                                                    {t('container.add_port')}
-                                                </button>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {formData.ports.map((port, index) => (
-                                                    <div key={index} className="flex gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={port}
-                                                            onChange={(e) => updateField('ports', index, e.target.value)}
-                                                            placeholder={t('container.port_placeholder')}
-                                                            className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeField('ports', index)}
-                                                            className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-100 text-red-600'}`}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                {formData.ports.length === 0 && (
-                                                    <p className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t('container.no_ports')}</p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* 卷挂载 */}
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    {t('container.volume_mapping')}
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => addField('volumes')}
-                                                    className={`text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors ${isDark ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'}`}
-                                                >
-                                                    <Plus className="w-3 h-3" />
-                                                    {t('container.add_volume')}
-                                                </button>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {formData.volumes.map((volume, index) => (
-                                                    <div key={index} className="flex gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={volume}
-                                                            onChange={(e) => updateField('volumes', index, e.target.value)}
-                                                            placeholder={t('container.volume_placeholder')}
-                                                            className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeField('volumes', index)}
-                                                            className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-100 text-red-600'}`}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                {formData.volumes.length === 0 && (
-                                                    <p className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t('container.no_volumes')}</p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* 环境变量 */}
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                    {t('container.env_vars')}
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => addField('env')}
-                                                    className={`text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors ${isDark ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'}`}
-                                                >
-                                                    <Plus className="w-3 h-3" />
-                                                    {t('container.add_env')}
-                                                </button>
-                                            </div>
-                                            <div className="space-y-2">
-                                                {formData.env.map((envVar, index) => (
-                                                    <div key={index} className="flex gap-2">
-                                                        <input
-                                                            type="text"
-                                                            value={envVar}
-                                                            onChange={(e) => updateField('env', index, e.target.value)}
-                                                            placeholder={t('container.env_placeholder')}
-                                                            className={`flex-1 px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeField('env', index)}
-                                                            className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-red-500/20 text-red-400' : 'hover:bg-red-100 text-red-600'}`}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                {formData.env.length === 0 && (
-                                                    <p className={`text-xs italic ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t('container.no_env')}</p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* 网络模式 */}
-                                        <div>
-                                            <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                {t('container.network_mode')}
-                                            </label>
-                                            <select
-                                                value={formData.network}
-                                                onChange={(e) => setFormData({ ...formData, network: e.target.value })}
-                                                className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
-                                            >
-                                                <option value="bridge" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.network_bridge')}</option>
-                                                <option value="host" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.network_host')}</option>
-                                                <option value="none" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.network_none')}</option>
-                                                <option value="container" className={isDark ? 'bg-gray-800 text-white' : ''}>Container</option>
-                                            </select>
-                                        </div>
 
 
-
-                                        {/* 重启策略 */}
-                                        <div>
-                                            <label className={`block text-sm font-medium mb-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                                                {t('container.restart_policy')}
-                                            </label>
-                                            <select
-                                                value={formData.restart}
-                                                onChange={(e) => setFormData({ ...formData, restart: e.target.value })}
-                                                className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
-                                            >
-                                                <option value="no" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.restart_no')}</option>
-                                                <option value="always" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.restart_always')}</option>
-                                                <option value="on-failure" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.restart_on_failure')}</option>
-                                                <option value="unless-stopped" className={isDark ? 'bg-gray-800 text-white' : ''}>{t('common.restart_unless_stopped')}</option>
-                                            </select>
-                                        </div>
-                                    </div>
                                 </form>
                             )}
                         </div>
@@ -973,23 +1238,47 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className={`flex-1 px-4 py-3 rounded-lg font-medium ${isDark ? 'glass glass-hover text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                                    className={`flex-1 px-4 py-3 rounded-lg font-medium ${isDark ? 'glass glass-hover text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'} ${mode === 'command' ? 'hidden' : ''}`}
                                 >
                                     {t('common.cancel')}
                                 </button>
                                 <button
                                     type="submit"
                                     form="create-container-form"
-                                    className={`flex-1 px-4 py-3 rounded-lg font-medium text-white disabled:opacity-50 ${isEdit ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600' : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'}`}
-                                    disabled={loading || (mode === 'command')}
+                                    className={`flex-1 px-4 py-3 rounded-lg font-medium text-white disabled:opacity-50 ${isEdit ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600' : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'} ${mode === 'command' ? 'hidden' : ''}`}
+                                    disabled={loading}
                                 >
                                     {loading ? (isEdit ? t('container.rebuilding') : t('container.creating')) : (isEdit ? t('container.rebuild_title') : t('container.create_title'))}
                                 </button>
+                                {mode === 'command' && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={parseDockerCommand}
+                                            className={`flex-1 px-4 py-3 rounded-lg font-medium ${isDark ? 'glass glass-hover text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                                        >
+                                            {t('container.parse_command')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                parseDockerCommand();
+                                                setTimeout(() => {
+                                                    const submitBtn = document.querySelector('button[form="create-container-form"]');
+                                                    if (submitBtn) submitBtn.click();
+                                                }, 100);
+                                            }}
+                                            className="flex-1 px-4 py-3 rounded-lg font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 shadow-lg shadow-cyan-500/20"
+                                        >
+                                            {t('container.run_directly')}
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </>
                 )}
             </div>
-        </div >
+        </div>
     );
 }

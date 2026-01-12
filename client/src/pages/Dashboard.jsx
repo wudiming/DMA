@@ -335,7 +335,7 @@ export default function Dashboard() {
                     <div className={`col-span-3 ${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-lg p-6 border`}>
                         <div className="space-y-4">
                             <StatsCard icon={<Container className="w-5 h-5" />} title={t('nav.containers')} value={stats?.containers.total || 0} subtitle={t('dashboard.running_count', { count: stats?.containers.running || 0 })} color="blue" onClick={() => navigate('/containers')} isDark={isDark} />
-                            <StatsCard icon={<Image className="w-5 h-5" />} title={t('nav.images')} value={stats?.images.total || 0} subtitle={stats?.images.sizeFormatted || '0 GB'} color="green" onClick={() => navigate('/images')} isDark={isDark} />
+                            <StatsCard icon={<Image className="w-5 h-5" />} title={t('nav.images')} value={stats?.images.total || 0} subtitle={t('dashboard.image_count', { count: stats?.images.total || 0 })} color="green" onClick={() => navigate('/images')} isDark={isDark} />
                             <StatsCard icon={<HardDrive className="w-5 h-5" />} title={t('nav.volumes')} value={stats?.volumes.total || 0} subtitle={t('dashboard.volume_count')} color="purple" onClick={() => navigate('/volumes')} isDark={isDark} />
                             <StatsCard icon={<Network className="w-5 h-5" />} title={t('nav.networks')} value={stats?.networks.total || 0} subtitle={t('dashboard.network_count')} color="orange" onClick={() => navigate('/networks')} isDark={isDark} />
                         </div>
