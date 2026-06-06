@@ -1,0 +1,11 @@
+{
+  "name": "dma",
+  "version": "1.1.1",
+  "type": "module",
+  "description": "Docker Manager App - single source of truth for version",
+  "private": true,
+  "scripts": {
+    "sync-version": "node sync-version.js",
+    "version:bump": "node sync-version.js"
+  }
+}
