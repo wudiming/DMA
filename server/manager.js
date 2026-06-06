@@ -1307,6 +1307,15 @@ app.post('/api/containers/:id/update', async (req, res) => {
     const containerInfo = await container.inspect();
     const imageName = containerInfo.Config.Image;
 
+    // 记录拉取前的旧镜像 ID，用于更新后清理
+    let oldImageId = null;
+    try {
+      const oldImageInfo = await dockerInstance.getImage(imageName).inspect();
+      oldImageId = oldImageInfo.Id;
+    } catch (e) {
+      // 镜像不存在，忽略
+    }
+
     const stream = await dockerInstance.pull(imageName);
     await new Promise((resolve, reject) => {
       dockerInstance.modem.followProgress(stream, (err, output) => {
@@ -1328,6 +1337,24 @@ app.post('/api/containers/:id/update', async (req, res) => {
     });
 
     await newContainer.start();
+
+    // 清理旧镜像（若镜像 ID 发生变化）
+    try {
+      const newImageInfo = await dockerInstance.getImage(imageName).inspect();
+      const newImageId = newImageInfo.Id;
+      if (oldImageId && oldImageId !== newImageId) {
+        console.log(`[Image Cleanup] Single update: image changed (${oldImageId.substring(0, 12)} -> ${newImageId.substring(0, 12)}). Removing old image.`);
+        try {
+          await dockerInstance.getImage(oldImageId).remove({ force: false });
+          console.log(`[Image Cleanup] Removed old image ${oldImageId.substring(0, 12)}`);
+        } catch (rmErr) {
+          console.warn(`[Image Cleanup] Could not remove old image (may be in use): ${rmErr.message}`);
+        }
+      }
+    } catch (e) {
+      console.warn('[Image Cleanup] Failed to check/remove old image:', e.message);
+    }
+
     res.json({ success: true, message: 'Container updated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -87,9 +87,15 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
     // Auto-fill WebUI when ports change or when adding WebUI
     useEffect(() => {
         if (showWebUiInput) {
-            let host = window.location.hostname;
-            if (currentEndpoint && currentEndpoint.id !== 'local') {
-                host = currentEndpoint.host || currentEndpoint.ip || host;
+            // currentEndpoint 是字符串ID，需要从 endpoints 数组里找完整对象取 host
+            let host = '';
+            if (currentEndpoint && currentEndpoint !== 'local') {
+                const endpointObj = endpoints.find(ep => ep.id === currentEndpoint);
+                host = endpointObj?.host || '';
+            }
+            // 本地节点或找不到 host 时，用访问域名/IP作为兜底
+            if (!host) {
+                host = window.location.hostname;
             }
 
             // Try to find a port
@@ -114,7 +120,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 setFormData(prev => ({ ...prev, webUi: newAutoFill }));
             }
         }
-    }, [showWebUiInput, currentEndpoint, formData.ports]); // Trigger when input is shown or ports change
+    }, [showWebUiInput, currentEndpoint, endpoints, formData.ports]); // Trigger when input is shown, endpoint changes or ports change
 
     const fetchTemplates = async () => {
         try {
