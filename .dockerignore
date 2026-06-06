@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+.git
+.vscode
+.idea
+*.zip
+*.tar.gz
+dist
+temp_*
+test
+docs
+*.log
+server/public
+*.md
+coverage

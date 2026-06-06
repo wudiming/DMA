@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  dma-app:
+    build: .
+    image: dma-app:latest
+    container_name: dma-app
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+      - "9002:9002"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/app/data
+    environment:
+      - PORT=9000
+      - BACKEND_PORT=9001
+      - NODE_ENV=production
+    restart: unless-stopped

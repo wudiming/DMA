@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  dma:
+    image: wudiming/dma:0.9.12-test
+    container_name: dma
+    ports:
+      - "9000:9000"
+      - "9002:9002"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/app/data
+      - ./server/manager.js:/app/manager.js
+      - ./server/services:/app/services
+    environment:
+      - PORT=9000
+    restart: unless-stopped
+
+  dma-agent:
+    image: wudiming/dma:0.9.12-test
+    container_name: dma-agent
+    ports:
+      - "9003:9002" # Map host 9003 to agent 9002
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DMA_MODE=agent
+      - DMA_SECRET=testsecret
+      - AGENT_PORT=9002
+    restart: unless-stopped
