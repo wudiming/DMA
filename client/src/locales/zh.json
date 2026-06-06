@@ -173,7 +173,8 @@
         "run_directly": "直接运行",
         "device_placeholder": "/dev/snd:/dev/snd:rwm",
         "sysctl_placeholder": "net.ipv4.ip_forward=1",
-        "cap_add_placeholder": "NET_ADMIN"
+        "cap_add_placeholder": "NET_ADMIN",
+        "network_custom_placeholder": "例：my-network 或 nginx_default"
     },
     "dashboard": {
         "cpu_usage": "CPU 使用率",

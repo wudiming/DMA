@@ -29,6 +29,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
     });
     const [showIconInput, setShowIconInput] = useState(false);
     const [showWebUiInput, setShowWebUiInput] = useState(false);
+    const [customNetwork, setCustomNetwork] = useState('');
     const [loading, setLoading] = useState(false);
     const [templates, setTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -60,6 +61,10 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
     useEffect(() => {
         fetchTemplates();
         if (initialData) {
+            // 判断是否为自定义网络（非内置的 bridge/host/none）
+            const builtinNetworks = ['bridge', 'host', 'none'];
+            const initNetwork = initialData.network || 'bridge';
+            const isCustomNet = !builtinNetworks.includes(initNetwork);
             setFormData({
                 name: initialData.name || '',
                 image: initialData.image || '',
@@ -69,7 +74,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 volumes: initialData.volumes || [],
                 env: initialData.env || [],
                 restart: initialData.restart || 'always',
-                network: initialData.network || 'bridge',
+                network: isCustomNet ? 'custom' : initNetwork,
                 alwaysPull: false,
                 entrypoint: initialData.entrypoint || '',
                 cmd: initialData.cmd || '',
@@ -77,6 +82,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 devices: initialData.devices || [],
                 sysctls: initialData.sysctls || []
             });
+            if (isCustomNet) setCustomNetwork(initNetwork);
             if (initialData.iconUrl) setShowIconInput(true);
             if (initialData.webUi) setShowWebUiInput(true);
         }
@@ -565,7 +571,8 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 volumes: formData.volumes.filter(v => v.trim()),
                 env: formData.env.filter(e => e.trim()),
                 restart: formData.restart,
-                network: formData.network,
+                network: formData.network === 'custom' ? (customNetwork.trim() || 'bridge') : formData.network,
+
                 labels: labels,
                 alwaysPull: formData.alwaysPull,
                 entrypoint: formData.entrypoint && formData.entrypoint.trim() ? formData.entrypoint.trim().split(' ') : undefined,
@@ -1015,10 +1022,11 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     {formData.network === 'custom' && (
                                                         <input
                                                             type="text"
-                                                            value={formData.network}
-                                                            onChange={(e) => setFormData({ ...formData, network: e.target.value })}
-                                                            placeholder="custom_network"
-                                                            className={`mt-2 w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                            value={customNetwork}
+                                                            onChange={(e) => setCustomNetwork(e.target.value)}
+                                                            placeholder={t('container.network_custom_placeholder', '例：my-network 或 nginx_default')}
+                                                            autoFocus
+                                                            className={`mt-2 w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white placeholder-gray-500' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                                                         />
                                                     )}
                                                 </div>
