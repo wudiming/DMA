@@ -20,6 +20,12 @@ const execAsync = util.promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// 从根目录 package.json 直接读取版本号（单一来源）
+const { version: APP_VERSION } = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8')
+);
+console.log(`[DMA] Version: ${APP_VERSION}`);
+
 // 全局错误处理，防止崩溃
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
@@ -314,8 +320,9 @@ app.post('/api/login', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'DMA Server is running' });
+  res.json({ status: 'ok', message: 'DMA Server is running', version: APP_VERSION });
 });
+
 
 // ==================== Dashboard批量数据API（性能优化） ====================
 
