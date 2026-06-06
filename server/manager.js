@@ -897,6 +897,10 @@ app.post('/api/containers/create', async (req, res) => {
     const { alwaysPull } = req.body;
     sendEvent('step', `检查镜像: ${image}`);
 
+    // 外层声明：pull 前后的镜像 ID，供自更新和普通重建路径共用
+    let pulledOldImageId = null;
+    let pulledNewImageId = null;
+
     let shouldPull = alwaysPull;
     if (!shouldPull) {
       try {
@@ -908,7 +912,7 @@ app.post('/api/containers/create', async (req, res) => {
     }
 
     if (shouldPull) {
-      // 记录拉取前的旧镜像ID，拉取后如镜像发生变化则删除旧版本
+      // 记录拉取前的旧镜像ID
       let oldImageId = null;
       try {
         const oldImage = dockerInstance.getImage(image);
@@ -937,29 +941,18 @@ app.post('/api/containers/create', async (req, res) => {
       });
       sendEvent('success', '镜像拉取完成');
 
-      // 拉取后检查镜像是否更新，若更新则删除旧版本镜像
+      // 拉取后记录镜像变更（不在此处清理旧镜像，由后续逻辑根据是否自更新决定）
       try {
-        const newImage = dockerInstance.getImage(image);
-        const newImageInfo = await newImage.inspect();
-        const newImageId = newImageInfo.Id;
-
-        if (oldImageId && oldImageId !== newImageId) {
-          console.log(`[Image Cleanup] Image updated (${oldImageId.substring(0, 12)} -> ${newImageId.substring(0, 12)}). Removing old image.`);
-          sendEvent('info', '检测到镜像已更新，正在清理旧版本镜像...');
-          try {
-            const oldImageObj = dockerInstance.getImage(oldImageId);
-            await oldImageObj.remove({ force: false }); // 若被其他容器引用则保留
-            console.log(`[Image Cleanup] Removed old image ${oldImageId}`);
-            sendEvent('info', `旧镜像已清理: ${oldImageId.substring(7, 19)}`);
-          } catch (rmErr) {
-            console.warn(`[Image Cleanup] Failed to remove old image:`, rmErr.message);
-            // 忽略删除失败（例如被其他容器使用）
-          }
+        const newImageInfo = await dockerInstance.getImage(image).inspect();
+        pulledOldImageId = oldImageId;       // pull 前的镜像 ID（赋值到外层变量）
+        pulledNewImageId = newImageInfo.Id;  // pull 后的镜像 ID
+        if (oldImageId && oldImageId !== pulledNewImageId) {
+          console.log(`[Image] Updated: ${oldImageId.substring(0, 12)} -> ${pulledNewImageId.substring(0, 12)}`);
         } else {
-          console.log(`[Image Cleanup] Image unchanged or new, no cleanup needed.`);
+          console.log(`[Image] Unchanged after pull.`);
         }
       } catch (e) {
-        console.warn('[Image Cleanup] Failed to check image change:', e.message);
+        console.warn('[Image] Failed to check image change after pull:', e.message);
       }
     }
 
@@ -1042,15 +1035,21 @@ app.post('/api/containers/create', async (req, res) => {
     if (volumes) volumes.forEach(v => runCommand += ` -v ${v}`);
     if (env) env.forEach(e => runCommand += ` -e "${e}"`);
     if (labels) Object.entries(labels).forEach(([k, v]) => runCommand += ` -l "${k}=${v}"`);
-    if (entrypoint) runCommand += ` --entrypoint "${entrypoint}"`;
+    if (entrypoint && Array.isArray(entrypoint) && entrypoint.length > 0) {
+      runCommand += ` --entrypoint "${entrypoint[0]}"`;
+      // 若 entrypoint 有多个词，其余词作为 cmd 前缀传入
+    }
     if (capAdd) capAdd.forEach(c => runCommand += ` --cap-add ${c}`);
     if (devices) devices.forEach(d => runCommand += ` --device ${d.PathOnHost}:${d.PathInContainer}:${d.CgroupPermissions}`);
     if (sysctls) Object.entries(sysctls).forEach(([k, v]) => runCommand += ` --sysctl ${k}=${v}`);
-    if (cmd) {
-      if (Array.isArray(cmd)) runCommand += ` ${cmd.join(' ')}`;
-      else runCommand += ` ${cmd}`;
-    }
+    // IMPORTANT: IMAGE 必须在 COMMAND 之前！docker run [OPTIONS] IMAGE [COMMAND]
+    // cmd 在 image 之前是严重 Bug：Docker 会把 cmd[0] 当镜像名（如 "node" → 官方 node 镜像）
     runCommand += ` ${image}`;
+    if (cmd) {
+      const cmdArr = Array.isArray(cmd) ? cmd : [cmd];
+      runCommand += ` ${cmdArr.join(' ')}`;
+    }
+
 
     sendEvent('step', '执行命令');
     sendEvent('command', runCommand);
@@ -1096,58 +1095,99 @@ app.post('/api/containers/create', async (req, res) => {
       }
 
       if (isSelfUpdate) {
-        sendEvent('info', '启动后台更新进程 (Updater)...');
+        // ── 自更新流程 ──────────────────────────────────────────────────────
+        // 步骤1：记录当前运行镜像ID（用于更新完成后清理旧镜像）
+        const oldImageId = oldInfo.Image;
+        console.log(`[Self Update] Old image ID: ${oldImageId.substring(0, 12)}`);
 
-        const updaterImage = image;
-        const base64Command = Buffer.from(runCommand).toString('base64');
-        // 用旧容器的实际名字做 rm（用户可能把 DMA 改名，这里用老名字确保能删掉）
+        // 步骤2：拉取最新镜像（若前面的创建流程已拉取则跳过；自更新始终需要最新版本）
+        if (!shouldPull) {
+          sendEvent('pull-start', `拉取最新镜像: ${image}`);
+          try {
+            await new Promise((resolve, reject) => {
+              dockerInstance.pull(image, (err, stream) => {
+                if (err) return reject(err);
+                dockerInstance.modem.followProgress(stream,
+                  (err, output) => { if (err) reject(err); else resolve(output); },
+                  (progress) => { sendEvent('pull', 'Pulling', progress); }
+                );
+              });
+            });
+            sendEvent('success', '最新镜像拉取完成');
+          } catch (pullErr) {
+            sendEvent('warning', `镜像拉取失败，将使用本地现有版本: ${pullErr.message}`);
+          }
+        }
+
+        // 步骤3：构建 Updater 脚本（不在脚本内重复 pull，pull 已在上方完成）
         const oldContainerName = oldInfo.Name.replace(/^\//, '');
-        // 不在 Updater 脚本中重新 pull 镜像（前端创建流程已按需拉取，重复 pull 浪费时间）
-        // 不删除镜像（若镜像 ID 未变则 rmi 会把正要用的镜像删掉）
-        const updaterCmdScript = `sleep 10 && docker rm -f ${oldContainerName} && (echo "${base64Command}" | base64 -d | sh)`;
+        const base64Command = Buffer.from(runCommand).toString('base64');
+
+        // 脚本：等待前端收到响应 → 删旧容器 → 用新配置启动新 DMA
+        // 旧镜像清理已由 pull 阶段处理，无需在脚本中重复 rmi
+        const updaterCmdScript = [
+          `sleep 10`,
+          `docker rm -f ${oldContainerName}`,
+          `(echo "${base64Command}" | base64 -d | sh)`
+        ].join(' && ');
+
+        console.log(`[Self Update] Updater script: rm ${oldContainerName} -> run new DMA`);
+        console.log(`[Self Update] base64 encoded run command: ${base64Command}`);
 
 
-        console.log(`[Self Update] Updater script (base64): ${base64Command}`);
-
-        sendEvent('success', '更新进程已启动！');
-        sendEvent('info', '服务将重启，连接将暂时中断。请稍后刷新页面。');
+        // 步骤4：发送提示，让前端准备好接收断连
+        sendEvent('info', '正在启动后台 Updater 容器...');
+        sendEvent('success', '✅ 更新进程已启动！');
+        sendEvent('info', '服务将在约10秒后重启，连接将暂时中断，请稍后刷新页面。');
         sendEvent('done', '更新中...');
 
+        // 步骤5：创建 Updater 临时容器（使用新镜像，执行完后 AutoRemove 自动销毁）
         let dockerSocketBind = '/var/run/docker.sock:/var/run/docker.sock';
         if (oldInfo.HostConfig?.Binds) {
           const socketBind = oldInfo.HostConfig.Binds.find(b => b.includes(':/var/run/docker.sock'));
           if (socketBind) {
             dockerSocketBind = socketBind;
-            console.log(`[Self Update] Detected custom Docker socket bind: ${dockerSocketBind}`);
+            console.log(`[Self Update] Using custom Docker socket bind: ${dockerSocketBind}`);
           }
         }
 
         const updaterContainer = await dockerInstance.createContainer({
-          Image: updaterImage,
+          Image: image,          // 使用新镜像（已 pull 到最新）
           Entrypoint: ['sh', '-c'],
           Cmd: [updaterCmdScript],
-          name: `${name}-updater-${Date.now()}`,
+          name: `dma-updater-${Date.now()}`,
           HostConfig: {
             Binds: [dockerSocketBind],
-            AutoRemove: true
+            AutoRemove: true     // 脚本执行完毕后临时容器自动删除
           },
           Detach: true
         });
 
         console.log(`[Self Update] Updater container created: ${updaterContainer.id}`);
         await updaterContainer.start();
-        console.log(`[Self Update] Updater container started`);
+        console.log(`[Self Update] Updater container started, waiting to replace DMA...`);
 
         res.end();
         return;
       }
 
-      // 普通编辑/重建：删除旧容器
+      // ── 普通编辑/重建（非自更新）：删除旧容器 ────────────────────────────
       sendEvent('info', '发现旧容器，正在删除...');
       try {
         const oldCtr = dockerInstance.getContainer(oldInfo.Id);
         await oldCtr.remove({ force: true });
         sendEvent('info', '旧容器已删除');
+
+        // 旧容器已删除，此时安全清理旧镜像（若镜像有更新）
+        if (pulledOldImageId && pulledNewImageId && pulledOldImageId !== pulledNewImageId) {
+          try {
+            await dockerInstance.getImage(pulledOldImageId).remove({ force: false });
+            sendEvent('info', `旧镜像已清理: ${pulledOldImageId.substring(7, 19)}`);
+            console.log(`[Image Cleanup] Removed old image ${pulledOldImageId.substring(0, 12)}`);
+          } catch (imgErr) {
+            console.warn('[Image Cleanup] Failed (may be shared):', imgErr.message);
+          }
+        }
       } catch (rmErr) {
         if (rmErr.statusCode !== 404) {
           console.warn('[Rebuild] Failed to remove old container:', rmErr.message);
@@ -1166,6 +1206,7 @@ app.post('/api/containers/create', async (req, res) => {
 
     sendEvent('done', '操作全部完成');
     res.end();
+
   } catch (error) {
     console.error('Create container error:', error);
     sendEvent('error', error.message);

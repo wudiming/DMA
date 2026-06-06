@@ -1,6 +1,50 @@
 # 更新日志
 
+## [1.1.8] - 2026-06-07
+
+### 修复
+
+- **严重 Bug：自更新后运行了错误镜像（`node` 官方镜像）导致崩溃**
+
+  **根本原因**：`runCommand` 构建时 `cmd` 追加在 `image` **之前**，违反了 Docker CLI 语法规则：
+  ```
+  # 错误（旧）：docker run [OPTIONS] cmd[0] cmd[1...] IMAGE
+  docker run -d --name dma ... node /app/index.js wudiming/dma:latest
+
+  # 正确（新）：docker run [OPTIONS] IMAGE [COMMAND]
+  docker run -d --name dma ... wudiming/dma:latest node /app/index.js
+  ```
+  Docker 把 cmd 的第一个词 `node` 当作镜像名，实际拉取并运行了 Docker Hub 的官方 `node:latest`（v26.3.0）镜像，而非 DMA 镜像。在 `node:latest` 容器内自然找不到 `/app/index.js`，因此崩溃报 `Cannot find module '/app/index.js'`，同时 Node.js 版本显示 v26.3.0（官方 node 镜像版本）。
+
+  **修复**：将 `runCommand += ` ${image}`` 移到 `cmd` 追加之前，确保 Docker run 命令语法正确。
+
+- **Updater 脚本简化**：去掉脚本中的 `docker rmi`，旧镜像清理已在 pull 阶段处理，无需重复。
+
+## [1.1.7] - 2026-06-07
+
+
+### 优化
+
+- **DMA 自我更新流程重构**：按照正确时序重新实现完整的自更新逻辑。
+
+  **正确流程（修复后）**：
+  1. 检测到操作对象是 DMA 自身 → 标记 `isSelfUpdate`
+  2. 记录当前运行容器的旧镜像 ID（`oldInfo.Image`）
+  3. 强制拉取最新镜像（若前序流程未拉取则在此处触发，有进度展示）
+  4. 构建 Updater 脚本（不在脚本内重复 pull，避免二次等待）
+  5. 使用**新镜像**创建临时 Updater 容器（`AutoRemove: true`，执行后自动销毁）
+  6. 立即结束响应，让前端收到提示后断开
+  7. Updater 脚本执行：`sleep 10 → docker rm -f <旧容器名> → <新配置 docker run> → docker rmi <旧镜像ID>`
+  8. 新 DMA 容器以正确配置启动，旧镜像文件清理完成，临时 Updater 容器自动销毁
+
+  **关键修复点**：
+  - 旧镜像 ID 从 `oldInfo.Image`（运行中容器的镜像）读取，而非 pull 后的新镜像
+  - `docker rmi <旧ImageId>` 在新容器启动后执行：若旧新镜像相同则 rmi 因新容器引用失败（`|| true` 忽略），若已更新则成功清理
+  - 镜像清理不在 pull 阶段立即执行（自更新时旧 DMA 仍在运行，立即 rmi 会失败）
+  - 普通容器重建（非自更新）：旧容器删除后立即清理旧镜像，时序安全
+
 ## [1.1.6] - 2026-06-07
+
 
 ### 修复
 
