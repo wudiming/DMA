@@ -1,6 +1,17 @@
 # 更新日志
 
+## [1.1.2] - 2026-06-07
+
+### 优化
+
+- **版本号管理统一**：将版本号管理重构为单一来源（`package.json`），彻底消除多处手动维护的问题。
+  - 根目录新增 `package.json` 作为版本号的**唯一权威来源**，只需修改此处即可同步所有子模块。
+  - `client/package.json` 和 `server/package.json` 移除各自的 `version` 字段，不再需要手动同步。
+  - 前端构建：`vite.config.js` 在构建时从根 `package.json` 读取版本，通过 `__APP_VERSION__` 全局常量注入，`constants.js` 直接读取展示。
+  - 后端运行时：`manager.js` 启动时从根 `package.json` 动态读取版本号，并通过 `/api/health` 接口暴露。
+
 ## [1.1.1] - 2026-06-07
+
 
 ### 修复
 
