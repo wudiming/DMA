@@ -879,7 +879,8 @@ app.post('/api/containers/:id/restart-policy', async (req, res) => {
 });
 
 app.post('/api/containers/create', async (req, res) => {
-  const { name, image, env, ports, volumes, restart, labels, network, entrypoint, cmd, capAdd, devices, sysctls } = req.body;
+  const { name, image, env, ports, volumes, restart, labels, network, entrypoint, cmd, capAdd, devices, sysctls, containerId: editContainerId } = req.body;
+
 
   // 设置响应头支持流式输出
   res.setHeader('Content-Type', 'application/x-ndjson');
@@ -1058,32 +1059,37 @@ app.post('/api/containers/create', async (req, res) => {
     sendEvent('step', '创建容器');
 
     let isSelfUpdate = false;
+    let oldInfo = null;
 
-    // 如果是重建，先尝试删除旧容器
+    // 查找旧容器：编辑模式下优先用 editContainerId（即使容器被改名也能找到自身）
+    // 创建新容器时用 name 查是否有同名旧容器
     try {
-      const oldContainer = dockerInstance.getContainer(name);
-      const oldInfo = await oldContainer.inspect();
+      const lookupKey = editContainerId || name;
+      const oldContainer = dockerInstance.getContainer(lookupKey);
+      oldInfo = await oldContainer.inspect();
+    } catch (e) {
+      if (e.statusCode !== 404) {
+        console.error('[Self Update] Error inspecting old container:', e.message);
+      }
+      // 404 = 不存在，oldInfo 保持 null
+    }
 
-      // 检测是否是自我更新
-      // 获取当前容器ID (在Docker中，hostname通常是容器ID)
+    if (oldInfo) {
+      // 检测是否是自我更新：用容器 ID 对比 hostname（容器内 hostname = 短容器ID）
       const currentContainerId = os.hostname();
-
-      // 检查ID是否匹配 (注意：hostname可能是短ID，inspect返回的是长ID)
-      // 检查ID是否匹配 (注意：hostname可能是短ID，inspect返回的是长ID)
       if (oldInfo.Id.startsWith(currentContainerId) || currentContainerId.startsWith(oldInfo.Id.substring(0, 12))) {
         isSelfUpdate = true;
-        console.log(`[Self Update] Detected self-update for container ${name} (${oldInfo.Id})`);
+        console.log(`[Self Update] Detected self-update for container ${oldInfo.Name} (${oldInfo.Id})`);
         sendEvent('warning', '⚠️ 检测到正在更新 DMA 自身');
       } else {
         // 检查是否是远程 Agent 更新
-        // 条件：非本地节点 + 容器环境变量包含 DMA_MODE=agent
-        const endpointId = req.headers['x-endpoint-id'];
-        if (endpointId && endpointId !== 'local') {
-          const env = oldInfo.Config?.Env || [];
-          const isAgent = env.some(e => e.includes('DMA_MODE=agent'));
+        const epId = req.headers['x-endpoint-id'];
+        if (epId && epId !== 'local') {
+          const envVars = oldInfo.Config?.Env || [];
+          const isAgent = envVars.some(e => e.includes('DMA_MODE=agent'));
           if (isAgent) {
             isSelfUpdate = true;
-            console.log(`[Agent Update] Detected update for remote agent ${name} on endpoint ${endpointId}`);
+            console.log(`[Agent Update] Detected update for remote agent ${oldInfo.Name} on endpoint ${epId}`);
             sendEvent('warning', '⚠️ 检测到正在更新远程 Agent');
           }
         }
@@ -1092,31 +1098,21 @@ app.post('/api/containers/create', async (req, res) => {
       if (isSelfUpdate) {
         sendEvent('info', '启动后台更新进程 (Updater)...');
 
-        // 优化：直接使用目标镜像作为 Updater，因为它肯定存在且包含 docker cli (假设是 DMA 镜像)
         const updaterImage = image;
-
-        // 构建 Updater 命令
-        // 使用 Base64 编码避免 Shell 转义问题
-        // 增加 sleep 时间到 10 秒，确保前端有足够时间接收响应
         const base64Command = Buffer.from(runCommand).toString('base64');
-        // 尝试在更新后删除旧镜像
         const oldImageId = oldInfo.Image;
-        // 增加 docker pull 确保使用最新镜像 (即使前面的 pull 跳过了)
-        const updaterCmdScript = `sleep 10 && docker rm -f ${name} && docker pull ${image} && (echo "${base64Command}" | base64 -d | sh) && (docker rmi ${oldImageId} || true)`;
+        // 用旧容器的实际名字做 rm（用户可能把 DMA 改名，这里用老名字确保能删掉）
+        const oldContainerName = oldInfo.Name.replace(/^\//, '');
+        const updaterCmdScript = `sleep 10 && docker rm -f ${oldContainerName} && docker pull ${image} && (echo "${base64Command}" | base64 -d | sh) && (docker rmi ${oldImageId} || true)`;
 
         console.log(`[Self Update] Updater script (base64): ${base64Command}`);
 
-        // 先发送提示消息，确保前端能收到
         sendEvent('success', '更新进程已启动！');
         sendEvent('info', '服务将重启，连接将暂时中断。请稍后刷新页面。');
         sendEvent('done', '更新中...');
 
-        // 启动 Updater 容器
-        // 使用目标镜像作为 Updater
-        // 必须挂载 docker socket
-        // 动态检测当前容器的 Docker Socket 挂载路径
         let dockerSocketBind = '/var/run/docker.sock:/var/run/docker.sock';
-        if (oldInfo.HostConfig && oldInfo.HostConfig.Binds) {
+        if (oldInfo.HostConfig?.Binds) {
           const socketBind = oldInfo.HostConfig.Binds.find(b => b.includes(':/var/run/docker.sock'));
           if (socketBind) {
             dockerSocketBind = socketBind;
@@ -1124,13 +1120,10 @@ app.post('/api/containers/create', async (req, res) => {
           }
         }
 
-        // Explicitly create and start the container to ensure it runs on remote nodes
         const updaterContainer = await dockerInstance.createContainer({
           Image: updaterImage,
-          Entrypoint: ['sh', '-c'], // 强制覆盖 Entrypoint，确保 Cmd 作为 shell 脚本执行
-          Cmd: [updaterCmdScript],  // 注意：这里不需要再加 'sh', '-c'，因为 Entrypoint 已经是了，或者 Entrypoint 为空，Cmd 为 ['sh', '-c', script]
-          // 修正：如果 Entrypoint 是 sh -c，那么 Cmd 应该是 [script]
-          // 为了保险，我们使用 Entrypoint=['sh', '-c'] 和 Cmd=[script]
+          Entrypoint: ['sh', '-c'],
+          Cmd: [updaterCmdScript],
           name: `${name}-updater-${Date.now()}`,
           HostConfig: {
             Binds: [dockerSocketBind],
@@ -1140,31 +1133,26 @@ app.post('/api/containers/create', async (req, res) => {
         });
 
         console.log(`[Self Update] Updater container created: ${updaterContainer.id}`);
-
         await updaterContainer.start();
         console.log(`[Self Update] Updater container started`);
 
-        // 结束响应，让前端断开连接
         res.end();
         return;
       }
 
-      sendEvent('info', '发现同名旧容器，正在删除...');
-      await oldContainer.remove({ force: true });
-      sendEvent('info', '旧容器已删除');
-    } catch (e) {
-      // 如果是自我更新失败，必须抛出错误，阻止后续创建容器
-      if (isSelfUpdate) {
-        console.error('Self-update failed:', e);
-        sendEvent('error', `自我更新启动失败: ${e.message}`);
-        throw e;
-      }
-
-      // 容器不存在，忽略，或者 inspect 失败
-      if (e.statusCode !== 404) {
-        console.error('Error checking old container:', e);
+      // 普通编辑/重建：删除旧容器
+      sendEvent('info', '发现旧容器，正在删除...');
+      try {
+        const oldCtr = dockerInstance.getContainer(oldInfo.Id);
+        await oldCtr.remove({ force: true });
+        sendEvent('info', '旧容器已删除');
+      } catch (rmErr) {
+        if (rmErr.statusCode !== 404) {
+          console.warn('[Rebuild] Failed to remove old container:', rmErr.message);
+        }
       }
     }
+
 
     const container = await dockerInstance.createContainer(containerConfig);
     sendEvent('success', `容器创建成功 ID: ${container.id.substring(0, 12)}`);

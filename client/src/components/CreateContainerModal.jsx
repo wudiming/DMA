@@ -559,6 +559,8 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
             const payload = {
                 name: formData.name,
                 image: formData.image,
+                // 编辑模式：带上旧容器 ID，后端用 ID 查找旧容器（改名后也能正确检测自更新）
+                containerId: isEdit ? initialData.containerId : undefined,
                 ports: formData.ports.filter(p => p.trim()),
                 volumes: formData.volumes.filter(v => v.trim()),
                 env: formData.env.filter(e => e.trim()),
@@ -566,7 +568,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 network: formData.network,
                 labels: labels,
                 alwaysPull: formData.alwaysPull,
-                entrypoint: formData.entrypoint && formData.entrypoint.trim() ? formData.entrypoint.trim().split(' ') : undefined, // Split by space for array
+                entrypoint: formData.entrypoint && formData.entrypoint.trim() ? formData.entrypoint.trim().split(' ') : undefined,
                 cmd: formData.cmd && formData.cmd.trim() ? formData.cmd.trim().split(' ') : undefined,
                 capAdd: formData.capAdd.filter(c => c.trim()),
                 devices: formData.devices.filter(d => d.PathOnHost && d.PathInContainer),
@@ -575,6 +577,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                     return acc;
                 }, {})
             };
+
 
             // 自动保存为模板
             try {
