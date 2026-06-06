@@ -1100,10 +1100,12 @@ app.post('/api/containers/create', async (req, res) => {
 
         const updaterImage = image;
         const base64Command = Buffer.from(runCommand).toString('base64');
-        const oldImageId = oldInfo.Image;
         // 用旧容器的实际名字做 rm（用户可能把 DMA 改名，这里用老名字确保能删掉）
         const oldContainerName = oldInfo.Name.replace(/^\//, '');
-        const updaterCmdScript = `sleep 10 && docker rm -f ${oldContainerName} && docker pull ${image} && (echo "${base64Command}" | base64 -d | sh) && (docker rmi ${oldImageId} || true)`;
+        // 不在 Updater 脚本中重新 pull 镜像（前端创建流程已按需拉取，重复 pull 浪费时间）
+        // 不删除镜像（若镜像 ID 未变则 rmi 会把正要用的镜像删掉）
+        const updaterCmdScript = `sleep 10 && docker rm -f ${oldContainerName} && (echo "${base64Command}" | base64 -d | sh)`;
+
 
         console.log(`[Self Update] Updater script (base64): ${base64Command}`);
 

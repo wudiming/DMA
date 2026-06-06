@@ -1,6 +1,20 @@
 # 更新日志
 
+## [1.1.6] - 2026-06-07
+
+### 修复
+
+- **彻底修复 `Cannot find module '/index.js'` 启动崩溃**：
+  - v1.1.4 的修复（将根 `package.json` 改为复制到 `/app/version.json`）解决了文件系统层面的歧义，但 `CMD ["node", "index.js"]` 仍是相对路径，Node.js v26+ 在某些构建环境下仍可能将包边界解析到 `/`，导致相对路径 `index.js` 被解析为 `/index.js`。
+  - 根本修复：改为 `CMD ["node", "/app/index.js"]` 使用**绝对路径**，Node.js 直接加载 `/app/index.js`，不再经过任何相对路径解析，彻底消除歧义，对所有 Node.js 版本均有效。
+
+- **自我更新 Updater 脚本优化**：
+  - 移除 Updater 脚本中的 `docker pull`：前端创建流程已按用户选择拉取镜像，Updater 无需重复拉取，去掉后大幅缩短更新等待时间。
+  - 移除 Updater 脚本中的 `docker rmi`：若镜像内容未变化，旧镜像 ID 与新镜像 ID 相同，`rmi` 会把刚要用的镜像删掉，导致新容器无法启动。
+  - 简化后 Updater 脚本：`sleep 10 → docker rm -f <旧容器名> → 执行新配置的 docker run`，逻辑清晰且安全。
+
 ## [1.1.5] - 2026-06-07
+
 
 ### 修复
 

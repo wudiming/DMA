@@ -4,10 +4,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
+    "start": "node /app/index.js",
     "dev": "node --watch index.js",
     "debug": "node debug_container.js"
   },
+
   "dependencies": {
     "cors": "^2.8.5",
     "dockerode": "^4.0.2",

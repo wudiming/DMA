@@ -47,4 +47,6 @@ ENV PORT=9000
 ENV NODE_ENV=production
 
 # Start command
-CMD ["node", "index.js"]
+# Use absolute path to avoid Node.js v26+ package-boundary resolution
+# resolving 'index.js' to '/index.js' instead of '/app/index.js'
+CMD ["node", "/app/index.js"]
