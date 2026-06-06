@@ -30,6 +30,8 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
     const [showIconInput, setShowIconInput] = useState(false);
     const [showWebUiInput, setShowWebUiInput] = useState(false);
     const [customNetwork, setCustomNetwork] = useState('');
+    const [networkIp, setNetworkIp] = useState('');
+
     const [loading, setLoading] = useState(false);
     const [templates, setTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -572,8 +574,10 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 env: formData.env.filter(e => e.trim()),
                 restart: formData.restart,
                 network: formData.network === 'custom' ? (customNetwork.trim() || 'bridge') : formData.network,
-
+                // 静态 IP：仅自定义网络有效，内置网络（bridge/host/none）忽略
+                networkIp: (formData.network === 'custom' && networkIp.trim()) ? networkIp.trim() : undefined,
                 labels: labels,
+
                 alwaysPull: formData.alwaysPull,
                 entrypoint: formData.entrypoint && formData.entrypoint.trim() ? formData.entrypoint.trim().split(' ') : undefined,
                 cmd: formData.cmd && formData.cmd.trim() ? formData.cmd.trim().split(' ') : undefined,
@@ -1020,15 +1024,32 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                         <option value="custom">{t('common.network_custom')}</option>
                                                     </select>
                                                     {formData.network === 'custom' && (
-                                                        <input
-                                                            type="text"
-                                                            value={customNetwork}
-                                                            onChange={(e) => setCustomNetwork(e.target.value)}
-                                                            placeholder={t('container.network_custom_placeholder', '例：my-network 或 nginx_default')}
-                                                            autoFocus
-                                                            className={`mt-2 w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white placeholder-gray-500' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                                                        />
+                                                        <div className="mt-2 space-y-2">
+                                                            {/* 自定义网络名 */}
+                                                            <input
+                                                                type="text"
+                                                                value={customNetwork}
+                                                                onChange={(e) => setCustomNetwork(e.target.value)}
+                                                                placeholder={t('container.network_custom_placeholder', '例：my-network 或 nginx_default')}
+                                                                autoFocus
+                                                                className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white placeholder-gray-500' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                            />
+                                                            {/* 静态 IP（可选，仅支持有 IPAM 的网络，如 macvlan） */}
+                                                            <div className="flex items-center gap-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={networkIp}
+                                                                    onChange={(e) => setNetworkIp(e.target.value)}
+                                                                    placeholder={t('container.network_ip_placeholder', '静态 IP（可选）例：192.168.1.100')}
+                                                                    className={`w-full px-4 py-2 rounded-lg ${isDark ? 'glass text-white placeholder-gray-500' : 'bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                                />
+                                                            </div>
+                                                            <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                                {t('container.network_ip_hint', '静态 IP 仅适用于已配置 IPAM（如 macvlan/ipvlan）的自定义网络')}
+                                                            </p>
+                                                        </div>
                                                     )}
+
                                                 </div>
 
                                                 <div>

@@ -164,7 +164,9 @@
         "run_directly": "Run Directly",
         "device_placeholder": "/dev/snd:/dev/snd:rwm",
         "sysctl_placeholder": "net.ipv4.ip_forward=1",
-        "network_custom_placeholder": "e.g. my-network or nginx_default"
+        "network_custom_placeholder": "e.g. my-network or nginx_default",
+        "network_ip_placeholder": "Static IP (optional) e.g. 192.168.1.100",
+        "network_ip_hint": "Static IP only works with networks that have IPAM configured (e.g. macvlan/ipvlan)"
 
     },
     "dashboard": {

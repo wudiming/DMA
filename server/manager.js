@@ -879,7 +879,7 @@ app.post('/api/containers/:id/restart-policy', async (req, res) => {
 });
 
 app.post('/api/containers/create', async (req, res) => {
-  const { name, image, env, ports, volumes, restart, labels, network, entrypoint, cmd, capAdd, devices, sysctls, containerId: editContainerId } = req.body;
+  const { name, image, env, ports, volumes, restart, labels, network, entrypoint, cmd, capAdd, devices, sysctls, containerId: editContainerId, networkIp } = req.body;
 
 
   // 设置响应头支持流式输出
@@ -1027,9 +1027,26 @@ app.post('/api/containers/create', async (req, res) => {
       containerConfig.ExposedPorts = exposedPorts;
     }
 
+    // 静态 IP：仅自定义网络支持，使用 NetworkingConfig.EndpointsConfig
+    // 注意：当 NetworkMode 为内置网络（bridge/host/none）时不支持设置静态 IP
+    const builtinNets = ['bridge', 'host', 'none', ''];
+    if (networkIp && networkIp.trim() && network && !builtinNets.includes(network)) {
+      containerConfig.NetworkingConfig = {
+        EndpointsConfig: {
+          [network]: {
+            IPAMConfig: {
+              IPv4Address: networkIp.trim()
+            }
+          }
+        }
+      };
+      console.log(`[Container] Static IP: ${networkIp.trim()} on network ${network}`);
+    }
+
     // 3. 生成并发送 docker run 命令日志
     let runCommand = `docker run -d --name ${name}`;
     if (network && network !== 'bridge') runCommand += ` --network ${network}`;
+    if (networkIp && networkIp.trim()) runCommand += ` --ip ${networkIp.trim()}`;
     if (restart && restart !== 'no') runCommand += ` --restart ${restart}`;
     if (ports) ports.forEach(p => runCommand += ` -p ${p}`);
     if (volumes) volumes.forEach(v => runCommand += ` -v ${v}`);
