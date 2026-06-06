@@ -31,6 +31,8 @@ export default function Dashboard() {
     const { theme, toggleTheme } = useThemeStore();
     const { refreshEndpoints, endpoints, currentEndpoint } = useEndpoint();
 
+    const [containerStatsLoading, setContainerStatsLoading] = useState(true);
+
     useEffect(() => {
         refreshEndpoints();
     }, []);
@@ -42,6 +44,7 @@ export default function Dashboard() {
         setUsage(null);
         setDisk(null);
         setNetwork(null);
+        setContainerStatsLoading(true);
 
         fetchAllData();
         const interval = setInterval(fetchAllData, 10000);
@@ -50,18 +53,31 @@ export default function Dashboard() {
 
     const fetchAllData = async () => {
         try {
+            // 阶段一：快速接口（< 500ms），立即渲染页面基础信息
             const response = await axios.get('/api/dashboard/batch');
             const data = response.data;
 
             setSystemInfo(data.systemInfo);
             setStats(data.stats);
-            setUsage(data.usage);
+            // 本地节点：usage 由 batch 直接提供；远程节点：usage=null，等 container-stats 更新
+            if (data.usage) setUsage(data.usage);
             setDisk(data.disk);
             setNetwork(data.network);
-            setContainerStats(data.containerStats);
             setImageStats(data.imageStats);
             setVolumeStats(data.volumeStats);
             setDataSource(data.dataSource || 'local');
+
+            // 阶段二：容器统计（可能较慢，但有服务端缓存，后续请求极快）
+            axios.get('/api/dashboard/container-stats').then(res => {
+                const cs = res.data;
+                if (cs.containerStats) setContainerStats(cs.containerStats);
+                // 远程节点：用 container-stats 的聚合结果更新 CPU/内存
+                if (cs.usage) setUsage(cs.usage);
+                setContainerStatsLoading(false);
+            }).catch(err => {
+                console.warn('Container stats fetch failed:', err);
+                setContainerStatsLoading(false);
+            });
         } catch (error) {
             console.error('Failed to fetch dashboard data:', error);
         }
@@ -316,7 +332,18 @@ export default function Dashboard() {
                             <TabButton label={t('nav.volumes')} active={activeTab === 'volumes'} onClick={() => setActiveTab('volumes')} isDark={isDark} />
                         </div>
 
-                        <div className="w-full">
+                        <div className="w-full relative">
+                            {/* 容器 Tab 首次加载时的占位提示 */}
+                            {activeTab === 'containers' && containerStatsLoading && containerStats.length === 0 && (
+                                <div className={`absolute inset-0 flex flex-col items-center justify-center rounded-lg z-10 ${isDark ? 'bg-gray-900/80' : 'bg-white/80'}`} style={{ height: 495 }}>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                                        <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                            正在加载容器统计数据...
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                             <UniversalTreeMap
                                 data={getCurrentTreeMapData()}
                                 type={activeTab === 'containers' ? 'container' : activeTab === 'images' ? 'image' : 'volume'}

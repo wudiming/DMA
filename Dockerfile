@@ -24,9 +24,11 @@ RUN npm install --omit=dev && npm cache clean --force
 # Copy server source code
 COPY server/ ./
 
-# Copy root package.json so server/manager.js can read ../package.json for the version
-# server WORKDIR is /app, so ../package.json resolves to /package.json
-COPY package.json /package.json
+# Copy root package.json as version.json so server/manager.js can read the version
+# IMPORTANT: Must NOT be named package.json at / or any parent of /app,
+# as Node.js v26+ uses parent package.json for package boundary detection,
+# which would cause 'Cannot find module /index.js' crash.
+COPY package.json /app/version.json
 
 # Copy client build artifacts to server's public directory
 # The server is configured to serve static files from 'public'

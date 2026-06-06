@@ -20,11 +20,17 @@ const execAsync = util.promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 从根目录 package.json 直接读取版本号（单一来源）
-const { version: APP_VERSION } = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../package.json'), 'utf-8')
-);
+// 读取版本号：Docker 容器内读 version.json（由 Dockerfile COPY 进来）
+// 本地开发时读根目录 package.json 作为兜底
+let APP_VERSION = 'dev';
+try {
+  const versionFile = path.join(__dirname, 'version.json');
+  const rootPkgFile = path.join(__dirname, '../package.json');
+  const target = fs.existsSync(versionFile) ? versionFile : rootPkgFile;
+  APP_VERSION = JSON.parse(fs.readFileSync(target, 'utf-8')).version || 'dev';
+} catch (e) { /* ignore */ }
 console.log(`[DMA] Version: ${APP_VERSION}`);
+
 
 // 全局错误处理，防止崩溃
 process.on('uncaughtException', (err) => {
@@ -326,13 +332,74 @@ app.get('/api/health', (req, res) => {
 
 // ==================== Dashboard批量数据API（性能优化） ====================
 
+// 容器统计缓存（stale-while-revalidate，TTL 30秒）
+// key: endpointId, value: { data, updatedAt }
+const containerStatsCache = new Map();
+const CONTAINER_STATS_TTL = 30000; // 30s
+
+// 异步计算并更新缓存（不阻塞请求）
+async function refreshContainerStatsCache(endpointId, dockerInstance, systemInfo) {
+  try {
+    const containers = await dockerInstance.listContainers({ all: false });
+    const runningList = containers.slice(0, 20);
+    const statsPromises = runningList.map(async (c) => {
+      try {
+        const s = await dockerInstance.getContainer(c.Id).stats({ stream: false });
+        return {
+          id: c.Id,
+          name: c.Names[0].replace('/', ''),
+          state: c.State,
+          memoryUsage: s.memory_stats?.usage || 0,
+          size: s.memory_stats?.usage || 0
+        };
+      } catch {
+        return { id: c.Id, name: c.Names[0].replace('/', ''), state: c.State, memoryUsage: 0, size: 0 };
+      }
+    });
+    const containerStats = await Promise.all(statsPromises);
+
+    // 同时计算聚合指标（用于远程节点CPU/内存显示）
+    let usage = null;
+    if (systemInfo) {
+      const allStats = (await Promise.all(
+        runningList.slice(0, 10).map(c =>
+          dockerInstance.getContainer(c.Id).stats({ stream: false }).catch(() => null)
+        )
+      )).filter(Boolean);
+      let totalCpu = 0;
+      allStats.forEach(s => {
+        const cpuDelta = (s.cpu_stats?.cpu_usage?.total_usage || 0) - (s.precpu_stats?.cpu_usage?.total_usage || 0);
+        const sysDelta = (s.cpu_stats?.system_cpu_usage || 0) - (s.precpu_stats?.system_cpu_usage || 0);
+        const cpus = s.cpu_stats?.online_cpus || systemInfo.NCPU || 1;
+        if (sysDelta > 0) totalCpu += (cpuDelta / sysDelta) * cpus * 100;
+      });
+      const totalMem = allStats.reduce((sum, s) => sum + (s.memory_stats?.usage || 0), 0);
+      const totalMemory = systemInfo.MemTotal || 0;
+      const netTotal = allStats.reduce((acc, s) => {
+        Object.values(s.networks || {}).forEach(n => { acc.rx += n.rx_bytes || 0; acc.tx += n.tx_bytes || 0; });
+        return acc;
+      }, { rx: 0, tx: 0 });
+      usage = {
+        cpu: { usage: Math.min(totalCpu, 100).toFixed(2), cores: systemInfo.NCPU },
+        memory: { usagePercent: totalMemory > 0 ? (totalMem / totalMemory * 100).toFixed(2) : '0', usedFormatted: formatBytes(totalMem), totalFormatted: formatBytes(totalMemory) },
+        network: { txFormatted: formatBytes(netTotal.tx) + '/s', rxFormatted: formatBytes(netTotal.rx) + '/s' }
+      };
+    }
+
+    containerStatsCache.set(endpointId, { data: { containerStats, usage }, updatedAt: Date.now() });
+  } catch (e) {
+    console.warn('[ContainerStats] Cache refresh failed:', e.message);
+  }
+}
+
+// 快速批量接口（< 500ms）：不再包含耗时的 per-container stats
 app.get('/api/dashboard/batch', async (req, res) => {
   try {
     const dockerInstance = getCurrentDocker(req);
     const os = await import('os');
     const { execSync } = await import('child_process');
 
-    // 并行获取所有基础数据
+    // 并行获取所有基础列表数据（无 per-container stats，全部为毫秒级操作）
     const [containers, images, volumes, networks, systemInfo] = await Promise.all([
       dockerInstance.listContainers({ all: true }),
       dockerInstance.listImages(),
@@ -341,8 +408,7 @@ app.get('/api/dashboard/batch', async (req, res) => {
       dockerInstance.info()
     ]);
 
-
-    // 计算统计数据
+    // 统计汇总
     const runningContainers = containers.filter(c => c.State === 'running').length;
     const totalContainers = containers.length;
     const totalImages = images.length;
@@ -350,94 +416,45 @@ app.get('/api/dashboard/batch', async (req, res) => {
     const totalNetworks = networks.length;
     const totalImageSize = images.reduce((sum, img) => sum + (img.Size || 0), 0);
 
-    // 判断是否为本地节点（通过检查endpoint header，兼容大小写）
-    const endpointId = req.headers['x-endpoint-id'] || req.headers['X-Endpoint-ID'] || 'local';
+    const endpointId = req.headers['x-endpoint-id'] || 'local';
     const isLocalNode = endpointId === 'local';
 
     let usage, diskInfo, networkInfo, dataSource;
 
     if (isLocalNode) {
-      // 本地节点：使用OS命令获取准确数据
+      // 本地节点：OS 模块直接读取，极快
       const cpuUsage = Math.min(os.loadavg()[0] * 10, 100).toFixed(2);
       const totalMem = os.totalmem();
       const freeMem = os.freemem();
       const usedMem = totalMem - freeMem;
-      const memoryUsagePercent = ((usedMem / totalMem) * 100).toFixed(2);
-
       usage = {
         cpu: { usage: parseFloat(cpuUsage), cores: systemInfo.NCPU },
         memory: {
-          usagePercent: parseFloat(memoryUsagePercent),
+          usagePercent: parseFloat(((usedMem / totalMem) * 100).toFixed(2)),
           usedFormatted: formatBytes(usedMem),
           totalFormatted: formatBytes(totalMem)
         }
       };
-
-      // 磁盘信息
       diskInfo = { usagePercent: 0, totalFormatted: 'N/A', usedFormatted: 'N/A', availableFormatted: 'N/A' };
       try {
-        const dfOutput = execSync('df -h / | tail -1').toString();
-        const parts = dfOutput.split(/\s+/);
-        diskInfo = {
-          totalFormatted: parts[1],
-          usedFormatted: parts[2],
-          availableFormatted: parts[3],
-          usagePercent: parseInt(parts[4])
-        };
+        const parts = execSync('df -h / | tail -1').toString().split(/\s+/);
+        diskInfo = { totalFormatted: parts[1], usedFormatted: parts[2], availableFormatted: parts[3], usagePercent: parseInt(parts[4]) };
       } catch (e) { }
-
-      // 网络信息
       networkInfo = { txFormatted: '0 B/s', rxFormatted: '0 B/s' };
-
       dataSource = 'local';
     } else {
-      // 远程节点：使用容器统计聚合
-      const aggregated = await aggregateContainerStats(dockerInstance, systemInfo);
-      usage = {
-        cpu: aggregated.cpu,
-        memory: aggregated.memory
-      };
-      networkInfo = aggregated.network;
-
-      // 远程节点的磁盘信息从Docker info获取
-      diskInfo = {
-        totalFormatted: formatBytes(systemInfo.MemTotal || 0),
-        usedFormatted: 'N/A',
-        availableFormatted: 'N/A',
-        usagePercent: 0
-      };
-
+      // 远程节点：基础信息来自 Docker info（极快），CPU/内存走缓存接口
+      usage = null; // 由前端从 /api/dashboard/container-stats 获取
+      diskInfo = { totalFormatted: formatBytes(systemInfo.MemTotal || 0), usedFormatted: 'N/A', availableFormatted: 'N/A', usagePercent: 0 };
+      networkInfo = { txFormatted: '0 B/s', rxFormatted: '0 B/s' };
       dataSource = 'aggregated';
+
+      // 触发后台缓存刷新（不阻塞响应）
+      refreshContainerStatsCache(endpointId, dockerInstance, systemInfo).catch(() => {});
     }
 
-    // 容器详细统计（限制20个以提升性能）
-    const runningContainersList = containers.filter(c => c.State === 'running').slice(0, 20);
-    const containerStatsPromises = runningContainersList.map(async (container) => {
-      try {
-        const containerObj = dockerInstance.getContainer(container.Id);
-        const stats = await containerObj.stats({ stream: false });
-        return {
-          id: container.Id,
-          name: container.Names[0].replace('/', ''),
-          state: container.State,
-          memoryUsage: stats.memory_stats.usage || 0,
-          size: stats.memory_stats.usage || 0
-        };
-      } catch {
-        return {
-          id: container.Id,
-          name: container.Names[0].replace('/', ''),
-          state: container.State,
-          memoryUsage: 0,
-          size: 0
-        };
-      }
-    });
-
-    const containerStatsData = await Promise.all(containerStatsPromises);
-
-    // 镜像详细统计
-    const imageStats = images.slice(0, 20).map(img => ({
+    // 镜像详细统计（仅列表数据，无需额外查询）
+    const imageStats = images.slice(0, 30).map(img => ({
       id: img.Id,
       name: (img.RepoTags && img.RepoTags[0]) || 'Untagged',
       size: img.Size || 0
@@ -452,7 +469,6 @@ app.get('/api/dashboard/batch', async (req, res) => {
       size: 104857600
     }));
 
-    // 返回所有数据
     res.json({
       systemInfo: {
         ServerVersion: systemInfo.ServerVersion,
@@ -472,22 +488,52 @@ app.get('/api/dashboard/batch', async (req, res) => {
         networks: { total: totalNetworks },
         system: { memoryTotalFormatted: formatBytes(systemInfo.MemTotal || 0) }
       },
-      usage: {
-        cpu: usage.cpu,
-        memory: usage.memory
-      },
+      usage,
       disk: diskInfo,
       network: networkInfo,
-      containerStats: containerStatsData,
-      imageStats: imageStats,
-      volumeStats: volumeStats,
-      dataSource: dataSource  // 'local' or 'aggregated'
+      imageStats,
+      volumeStats,
+      dataSource
     });
   } catch (error) {
     console.error('Error fetching dashboard batch data:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard data' });
   }
 });
+
+// 容器统计接口（慢但缓存，stale-while-revalidate）
+// 首次请求：同步计算（慢），之后：从缓存返回（< 50ms），后台刷新
+app.get('/api/dashboard/container-stats', async (req, res) => {
+  const endpointId = req.headers['x-endpoint-id'] || 'local';
+  const cached = containerStatsCache.get(endpointId);
+  const now = Date.now();
+
+  if (cached) {
+    // 有缓存：立即返回
+    res.json(cached.data);
+    // 若缓存已过期，后台异步刷新
+    if (now - cached.updatedAt > CONTAINER_STATS_TTL) {
+      const dockerInstance = getCurrentDocker(req);
+      dockerInstance.info().then(sysInfo =>
+        refreshContainerStatsCache(endpointId, dockerInstance, sysInfo)
+      ).catch(() => {});
+    }
+    return;
+  }
+
+  // 无缓存：首次同步计算
+  try {
+    const dockerInstance = getCurrentDocker(req);
+    const systemInfo = await dockerInstance.info();
+    await refreshContainerStatsCache(endpointId, dockerInstance, systemInfo);
+    const result = containerStatsCache.get(endpointId);
+    res.json(result ? result.data : { containerStats: [], usage: null });
+  } catch (error) {
+    console.error('Error fetching container stats:', error);
+    res.json({ containerStats: [], usage: null });
+  }
+});
+
 
 // ==================== 系统信息 ====================
 

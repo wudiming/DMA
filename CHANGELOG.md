@@ -1,6 +1,23 @@
 # 更新日志
 
+## [1.1.4] - 2026-06-07
+
+### 修复
+
+- **关键崩溃修复（Cannot find module '/index.js'）**：修复了 v1.1.2/1.1.3 引入的 Docker 镜像启动崩溃问题。
+  - 根本原因：Dockerfile 将根目录 `package.json` 复制到容器文件系统根 `/package.json`，该文件含 `"type": "module"`，导致 Node.js v26+ 将 `/` 作为包边界，进而把 `node index.js` 解析为绝对路径 `/index.js` 而非 `/app/index.js`。
+  - 修复方案：改为复制到 `/app/version.json`（不与 Node.js 包解析路径冲突），服务端读取时优先查 `version.json`，本地开发回退到根目录 `package.json`。
+
+### 优化
+
+- **概览页（Dashboard）加载速度大幅提升**：首屏可见时间从 3~8 秒降至 **< 1 秒**。
+  - 根本原因分析：原 `/api/dashboard/batch` 接口在响应前会串联 `docker stats`（最多 20 个容器），每次 1~2 秒，整体等待 3~8 秒。
+  - **后端**：将耗时的 per-container stats 从 batch 接口剥离，新增 `/api/dashboard/container-stats` 独立接口，内置 **30 秒 stale-while-revalidate 服务端缓存**。首次计算后，后续请求命中缓存响应时间 < 50ms。
+  - **前端**：改为两阶段并行加载：①快速 batch 接口（< 500ms）返回后立即渲染页面全部基础信息；② container-stats 异步加载填充 TreeMap，加载期间显示旋转占位动画。
+  - 远程节点 CPU/内存聚合计算同样移至缓存接口，batch 接口全链路无阻塞操作。
+
 ## [1.1.3] - 2026-06-07
+
 
 ### 修复
 
