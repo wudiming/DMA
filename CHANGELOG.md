@@ -10,6 +10,10 @@
   - 前端构建：`vite.config.js` 在构建时从根 `package.json` 读取版本，通过 `__APP_VERSION__` 全局常量注入，`constants.js` 直接读取展示。
   - 后端运行时：`manager.js` 启动时从根 `package.json` 动态读取版本号，并通过 `/api/health` 接口暴露。
 
+### 修复
+
+- **Docker 构建修复**：修复了多阶段构建中 `npm run build` 失败的问题。根目录 `package.json` 现在在构建时被正确复制到镜像中（Stage 1 供 Vite 读取，Stage 2 供 Server 读取），并移除了 Dockerfile 中已废弃的硬编码 `ENV APP_VERSION`。
+
 ## [1.1.1] - 2026-06-07
 
 

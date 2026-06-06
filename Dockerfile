@@ -6,6 +6,9 @@ WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
 
+# Copy root package.json so vite.config.js can read ../package.json for the version
+COPY package.json /app/package.json
+
 # Copy source and build
 COPY client/ ./
 RUN npm run build
@@ -20,6 +23,10 @@ RUN npm install --omit=dev && npm cache clean --force
 
 # Copy server source code
 COPY server/ ./
+
+# Copy root package.json so server/manager.js can read ../package.json for the version
+# server WORKDIR is /app, so ../package.json resolves to /package.json
+COPY package.json /package.json
 
 # Copy client build artifacts to server's public directory
 # The server is configured to serve static files from 'public'
@@ -36,7 +43,6 @@ EXPOSE 9000 9002
 # Environment variables
 ENV PORT=9000
 ENV NODE_ENV=production
-ENV APP_VERSION=1.1.0
 
 # Start command
 CMD ["node", "index.js"]
