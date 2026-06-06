@@ -1,6 +1,46 @@
 # 更新日志
 
+## [1.1.9] - 2026-06-07
+
+### 修复
+
+- **自定义网络输入框无法编辑**：选择 Custom 网络模式后，下方输入框因 `value` 绑定到同一个 `formData.network` 字段，导致输入被立即覆盖，完全无法编辑。
+  - 新增独立 state `customNetwork` 专门存储自定义网络名称
+  - 编辑已有容器时，若原网络不属于内置网络（bridge/host/none），自动识别为 Custom 模式并回填
+  - 选择 Custom 时输入框自动获得焦点
+
+- **网络创建弹窗不同驱动选项混乱**：所有驱动一律显示全部选项，如给 host 网络设置 Internal/IPv6 等毫无意义，现按驱动能力矩阵动态显示。
+
+### 新增
+
+- **创建容器：自定义网络静态 IP 支持**（macvlan/ipvlan 场景）
+  - Custom 网络模式下新增可选的「静态 IP」输入框
+  - 通过 Docker API `NetworkingConfig.EndpointsConfig.IPAMConfig.IPv4Address` 设置（等价于 `--ip`）
+
+- **网络创建：驱动感知 UI**，根据所选驱动动态展示相关字段：
+
+  | 驱动 | IPv4/IPv6 | 隔离外网 | 允许附加 | 物理网卡 |
+  |---|:---:|:---:|:---:|:---:|
+  | bridge | ✅ | ✅ | — | — |
+  | macvlan | ✅（须与物理网段一致） | ✅ | — | ✅ **必填** |
+  | ipvlan | ✅ | ✅ | — | ✅ **必填** |
+  | overlay | ✅ | ✅ | ✅ 专属 | — |
+  | host | — | — | — | — |
+  | null | — | — | — | — |
+
+  - **macvlan / ipvlan**：新增「物理网卡（Parent Interface）」必填项 + 工作模式选择器
+    - macvlan 模式：bridge（默认）/ private / vepa / passthru
+    - ipvlan 模式：l2（默认）/ l3 / l3s
+    - 缺少 parent 时提交前校验并提示
+  - **host / null**：隐藏所有配置项，显示说明文字
+  - **Attachable** 开关：仅 overlay 驱动显示（该功能 overlay 专属）
+  - **IPv6**：ipvlan 不显示（其 L3 模式不支持 IPv6 双栈），其余驱动正常显示
+  - 切换驱动时自动重置驱动专属字段（保留网络名）
+  - 新增 **ipvlan** 驱动选项
+  - macvlan/ipvlan 的 IPv4 配置面板显示「须与物理网络网段一致」提示
+
 ## [1.1.8] - 2026-06-07
+
 
 ### 修复
 

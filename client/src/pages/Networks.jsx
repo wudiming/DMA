@@ -258,57 +258,123 @@ function NetworkCard({ network, isDark, actionMenuId, setActionMenuId, handleRem
     );
 }
 
+
+// ── 各驱动支持的能力矩阵 ─────────────────────────────────────────────────────
+const DRIVER_CAPS = {
+    bridge:  { ipam: true,  internal: true,  ipv6: true,  attachable: false, parent: false },
+    macvlan: { ipam: true,  internal: true,  ipv6: true,  attachable: false, parent: true,  parentRequired: true  },
+    ipvlan:  { ipam: true,  internal: true,  ipv6: false, attachable: false, parent: true,  parentRequired: true  },
+    overlay: { ipam: true,  internal: true,  ipv6: true,  attachable: true,  parent: false },
+    host:    { ipam: false, internal: false, ipv6: false, attachable: false, parent: false },
+    null:    { ipam: false, internal: false, ipv6: false, attachable: false, parent: false },
+};
+
+// macvlan 子模式
+const MACVLAN_MODES = [
+    { value: '',          label: 'bridge（默认，推荐）' },
+    { value: 'private',   label: 'private（隔离，容器间不通）' },
+    { value: 'vepa',      label: 'vepa（需交换机支持）' },
+    { value: 'passthru',  label: 'passthru（独占物理网卡）' },
+];
+
+// ipvlan 子模式
+const IPVLAN_MODES = [
+    { value: '',    label: 'l2（默认，二层）' },
+    { value: 'l3',  label: 'l3（三层路由）' },
+    { value: 'l3s', label: 'l3s（三层对称路由）' },
+];
+
 function CreateNetworkModal({ isOpen, onClose, isDark, onCreated }) {
     const { t } = useTranslation();
     const [formData, setFormData] = useState({
         Name: '',
         Driver: 'bridge',
+        // IPAM
         EnableIPv4: false,
         IPv4Subnet: '',
         IPv4Gateway: '',
         EnableIPv6: false,
         IPv6Subnet: '',
         IPv6Gateway: '',
+        // 标志
         Internal: false,
         Attachable: false,
-        Ingress: false,
-        Options: [] // Array of { key, value }
+        // macvlan / ipvlan 专属
+        Parent: '',     // 物理网卡，如 eth0、eno1
+        VlanMode: '',   // macvlan: bridge/private/vepa/passthru; ipvlan: l2/l3/l3s
+        // 自定义驱动参数（KV 对）
+        Options: []
     });
+    const [submitting, setSubmitting] = useState(false);
 
     if (!isOpen) return null;
 
+    const caps = DRIVER_CAPS[formData.Driver] || DRIVER_CAPS.bridge;
+    const isSimpleDriver = formData.Driver === 'host' || formData.Driver === 'null';
+
+    const set = (patch) => setFormData(prev => ({ ...prev, ...patch }));
+
+    // 切换驱动时重置驱动专属字段，但保留名称
+    const handleDriverChange = (driver) => {
+        setFormData(prev => ({
+            ...prev,
+            Driver: driver,
+            // 重置驱动专属
+            EnableIPv4: false, IPv4Subnet: '', IPv4Gateway: '',
+            EnableIPv6: false, IPv6Subnet: '', IPv6Gateway: '',
+            Internal: false, Attachable: false,
+            Parent: '', VlanMode: '',
+            Options: []
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (caps.parent && caps.parentRequired && !formData.Parent.trim()) {
+            alert('请填写物理网卡名称（Parent Interface），macvlan/ipvlan 必须指定');
+            return;
+        }
+        setSubmitting(true);
         try {
+            // 构建 Options 对象
+            const driverOptions = {};
+            if (caps.parent && formData.Parent.trim()) {
+                driverOptions['parent'] = formData.Parent.trim();
+            }
+            if (formData.VlanMode) {
+                driverOptions['mode'] = formData.VlanMode;
+            }
+            // 合并用户自定义 KV
+            formData.Options.forEach(({ key, value }) => {
+                if (key && value) driverOptions[key] = value;
+            });
+
             const payload = {
                 Name: formData.Name,
                 Driver: formData.Driver,
-                Internal: formData.Internal,
-                Attachable: formData.Attachable,
-                Ingress: formData.Ingress,
-                EnableIPv6: formData.EnableIPv6,
-                Options: formData.Options.reduce((acc, curr) => {
-                    if (curr.key && curr.value) acc[curr.key] = curr.value;
-                    return acc;
-                }, {}),
-                IPAM: {
-                    Config: []
-                }
+                Internal: caps.internal ? formData.Internal : undefined,
+                Attachable: caps.attachable ? formData.Attachable : undefined,
+                EnableIPv6: caps.ipv6 ? formData.EnableIPv6 : undefined,
+                Options: Object.keys(driverOptions).length > 0 ? driverOptions : undefined,
+                IPAM: { Config: [] }
             };
 
-            if (formData.EnableIPv4 && formData.IPv4Subnet) {
+            if (caps.ipam && formData.EnableIPv4 && formData.IPv4Subnet.trim()) {
                 payload.IPAM.Config.push({
-                    Subnet: formData.IPv4Subnet,
-                    Gateway: formData.IPv4Gateway || undefined
+                    Subnet: formData.IPv4Subnet.trim(),
+                    Gateway: formData.IPv4Gateway.trim() || undefined
                 });
             }
+            if (caps.ipv6 && formData.EnableIPv6 && formData.IPv6Subnet.trim()) {
+                payload.IPAM.Config.push({
+                    Subnet: formData.IPv6Subnet.trim(),
+                    Gateway: formData.IPv6Gateway.trim() || undefined
+                });
+            }
+            if (payload.IPAM.Config.length === 0) delete payload.IPAM;
 
-            if (formData.EnableIPv6 && formData.IPv6Subnet) {
-                payload.IPAM.Config.push({
-                    Subnet: formData.IPv6Subnet,
-                    Gateway: formData.IPv6Gateway || undefined
-                });
-            }
+            // 移除 undefined 字段
+            Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
 
             await axios.post('/api/networks', payload);
             onCreated();
@@ -316,27 +382,37 @@ function CreateNetworkModal({ isOpen, onClose, isDark, onCreated }) {
         } catch (error) {
             console.error('Failed to create network:', error);
             alert(`创建失败: ${error.response?.data?.error || error.message}`);
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    const addOption = () => {
-        setFormData({ ...formData, Options: [...formData.Options, { key: '', value: '' }] });
+    const addOption = () => set({ Options: [...formData.Options, { key: '', value: '' }] });
+    const updateOption = (idx, field, val) => {
+        const opts = [...formData.Options];
+        opts[idx][field] = val;
+        set({ Options: opts });
     };
+    const removeOption = (idx) => set({ Options: formData.Options.filter((_, i) => i !== idx) });
 
-    const updateOption = (index, field, value) => {
-        const newOptions = [...formData.Options];
-        newOptions[index][field] = value;
-        setFormData({ ...formData, Options: newOptions });
-    };
+    // 样式快捷
+    const inputCls = `w-full px-4 py-2.5 rounded-lg border ${isDark
+        ? 'bg-black/20 border-white/10 text-white placeholder-gray-500'
+        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+    } focus:ring-2 focus:ring-blue-500/50 outline-none transition-all`;
 
-    const removeOption = (index) => {
-        const newOptions = formData.Options.filter((_, i) => i !== index);
-        setFormData({ ...formData, Options: newOptions });
-    };
+    const sectionCls = `p-4 rounded-lg border ${isDark
+        ? 'bg-white/5 border-white/10'
+        : 'bg-gray-50 border-gray-200'
+    }`;
+
+    const labelCls = `block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`;
+    const subLabelCls = `text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`;
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className={`${isDark ? 'glass border-white/20' : 'bg-white border-gray-200'} rounded-xl w-full max-w-2xl border shadow-2xl max-h-[90vh] overflow-y-auto`}>
+                {/* 标题栏 */}
                 <div className={`p-6 border-b ${isDark ? 'border-white/10' : 'border-gray-100'} flex items-center justify-between sticky top-0 ${isDark ? 'bg-gray-900/95' : 'bg-white/95'} backdrop-blur z-10`}>
                     <h2 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         {t('network.create')}
@@ -346,174 +422,269 @@ function CreateNetworkModal({ isOpen, onClose, isDark, onCreated }) {
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    {/* 名称 */}
-                    <div className="space-y-2">
-                        <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                <form onSubmit={handleSubmit} className="p-6 space-y-5">
+
+                    {/* ── 网络名称 ── */}
+                    <div className="space-y-1.5">
+                        <label className={labelCls}>
                             <span className="text-red-500 mr-1">*</span>{t('common.name')}
                         </label>
                         <input
-                            type="text"
-                            required
+                            type="text" required
                             value={formData.Name}
-                            onChange={e => setFormData({ ...formData, Name: e.target.value })}
+                            onChange={e => set({ Name: e.target.value })}
                             placeholder={t('network.name_placeholder')}
-                            className={`w-full px-4 py-2.5 rounded-lg border ${isDark ? 'bg-black/20 border-white/10 text-white placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900'} focus:ring-2 focus:ring-blue-500/50 outline-none transition-all`}
+                            className={inputCls}
                         />
                     </div>
 
-                    {/* 驱动 */}
-                    <div className="space-y-2">
-                        <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            {t('network.driver')}
-                        </label>
+                    {/* ── 驱动类型 ── */}
+                    <div className="space-y-1.5">
+                        <label className={labelCls}>{t('network.driver')}</label>
                         <select
                             value={formData.Driver}
-                            onChange={e => setFormData({ ...formData, Driver: e.target.value })}
-                            className={`w-full px-4 py-2.5 rounded-lg border ${isDark ? 'bg-gray-800 border-white/10 text-white [&>option]:bg-gray-800' : 'bg-white border-gray-300 text-gray-900'} focus:ring-2 focus:ring-blue-500/50 outline-none transition-all`}
+                            onChange={e => handleDriverChange(e.target.value)}
+                            className={`${inputCls} cursor-pointer`}
                         >
-                            <option value="bridge">bridge</option>
-                            <option value="host">host</option>
-                            <option value="overlay">overlay</option>
-                            <option value="macvlan">macvlan</option>
-                            <option value="null">null</option>
+                            <option value="bridge">bridge — 标准桥接网络（默认）</option>
+                            <option value="macvlan">macvlan — 容器直接接入物理网络</option>
+                            <option value="ipvlan">ipvlan — 共享 MAC 的虚拟网络</option>
+                            <option value="overlay">overlay — 跨主机 Swarm 网络</option>
+                            <option value="host">host — 共享宿主机网络栈</option>
+                            <option value="null">null — 完全隔离（无网络）</option>
                         </select>
                     </div>
 
-                    {/* 开关选项组 */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <ToggleField
-                            label={t('network.custom_ipv4')}
-                            checked={formData.EnableIPv4}
-                            onChange={checked => setFormData({ ...formData, EnableIPv4: checked })}
-                            isDark={isDark}
-                        />
-                        <ToggleField
-                            label={t('network.internal')}
-                            checked={formData.Internal}
-                            onChange={checked => setFormData({ ...formData, Internal: checked })}
-                            isDark={isDark}
-                        />
-                        <ToggleField
-                            label={t('network.attachable')}
-                            checked={formData.Attachable}
-                            onChange={checked => setFormData({ ...formData, Attachable: checked })}
-                            isDark={isDark}
-                        />
-                        <ToggleField
-                            label={t('network.enable_ipv6')}
-                            checked={formData.EnableIPv6}
-                            onChange={checked => setFormData({ ...formData, EnableIPv6: checked })}
-                            isDark={isDark}
-                        />
-                    </div>
-
-                    {/* IPv4 配置 */}
-                    {formData.EnableIPv4 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10">
-                            <div className="space-y-2">
-                                <label className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t('network.ipv4_subnet')}</label>
-                                <input
-                                    type="text"
-                                    placeholder={t('network.subnet_placeholder')}
-                                    value={formData.IPv4Subnet}
-                                    onChange={e => setFormData({ ...formData, IPv4Subnet: e.target.value })}
-                                    className={`w-full px-3 py-2 rounded border ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t('network.ipv4_gateway')}</label>
-                                <input
-                                    type="text"
-                                    placeholder={t('network.gateway_placeholder')}
-                                    value={formData.IPv4Gateway}
-                                    onChange={e => setFormData({ ...formData, IPv4Gateway: e.target.value })}
-                                    className={`w-full px-3 py-2 rounded border ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
-                                />
+                    {/* ── host / null 驱动说明 ── */}
+                    {isSimpleDriver && (
+                        <div className={`${sectionCls} flex items-start gap-3`}>
+                            <span className="text-2xl">{formData.Driver === 'host' ? '🖥️' : '🚫'}</span>
+                            <div>
+                                <p className={`text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                                    {formData.Driver === 'host'
+                                        ? 'host 网络：容器直接使用宿主机网络栈'
+                                        : 'null 网络：容器完全没有网络接口'}
+                                </p>
+                                <p className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    {formData.Driver === 'host'
+                                        ? '不创建独立网络命名空间，容器端口即宿主机端口，无需端口映射。每台主机只能有一个 host 网络。'
+                                        : '只有 loopback 接口，适合不需要网络的纯计算任务或安全隔离场景。'}
+                                </p>
                             </div>
                         </div>
                     )}
 
-                    {/* IPv6 配置 */}
-                    {formData.EnableIPv6 && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-lg bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10">
-                            <div className="space-y-2">
-                                <label className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t('network.ipv6_subnet')}</label>
+                    {/* ── macvlan / ipvlan 物理网卡 ── */}
+                    {caps.parent && (
+                        <div className={`${sectionCls} space-y-4`}>
+                            <p className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`}>
+                                {formData.Driver === 'macvlan' ? 'macvlan' : 'ipvlan'} 配置
+                            </p>
+
+                            {/* Parent 网卡 */}
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>
+                                    <span className="text-red-500 mr-1">*</span>
+                                    物理网卡（Parent Interface）
+                                </label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. 2001:db8::/64"
-                                    value={formData.IPv6Subnet}
-                                    onChange={e => setFormData({ ...formData, IPv6Subnet: e.target.value })}
-                                    className={`w-full px-3 py-2 rounded border ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
+                                    value={formData.Parent}
+                                    onChange={e => set({ Parent: e.target.value })}
+                                    placeholder="例：eth0、eno1、enp3s0"
+                                    className={inputCls}
                                 />
+                                <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                    容器将直接接入该物理网卡所在的网段，需与子网配置匹配。可用 <code className="font-mono">ip link show</code> 查看宿主机网卡名称。
+                                </p>
                             </div>
-                            <div className="space-y-2">
-                                <label className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t('network.ipv6_gateway')}</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. 2001:db8::1"
-                                    value={formData.IPv6Gateway}
-                                    onChange={e => setFormData({ ...formData, IPv6Gateway: e.target.value })}
-                                    className={`w-full px-3 py-2 rounded border ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
-                                />
+
+                            {/* 子模式 */}
+                            <div className="space-y-1.5">
+                                <label className={labelCls}>
+                                    工作模式
+                                </label>
+                                <select
+                                    value={formData.VlanMode}
+                                    onChange={e => set({ VlanMode: e.target.value })}
+                                    className={`${inputCls} cursor-pointer`}
+                                >
+                                    {(formData.Driver === 'macvlan' ? MACVLAN_MODES : IPVLAN_MODES).map(m => (
+                                        <option key={m.value} value={m.value}>{m.label}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                     )}
 
-                    {/* 自定义驱动配置 */}
-                    <div className="space-y-3">
-                        <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            {t('network.custom_driver_opts')}
-                        </label>
-                        <div className="space-y-2">
-                            {formData.Options.map((opt, idx) => (
-                                <div key={idx} className="flex gap-2">
+                    {/* ── 开关选项（仅对支持的驱动显示） ── */}
+                    {!isSimpleDriver && (
+                        <div className={`${sectionCls} space-y-3`}>
+                            <p className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                网络选项
+                            </p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {/* 自定义 IPv4 */}
+                                {caps.ipam && (
+                                    <ToggleField
+                                        label="自定义 IPv4 子网"
+                                        checked={formData.EnableIPv4}
+                                        onChange={v => set({ EnableIPv4: v })}
+                                        isDark={isDark}
+                                    />
+                                )}
+                                {/* 隔离外网 */}
+                                {caps.internal && (
+                                    <ToggleField
+                                        label="隔离外部访问"
+                                        checked={formData.Internal}
+                                        onChange={v => set({ Internal: v })}
+                                        isDark={isDark}
+                                    />
+                                )}
+                                {/* 允许附加（仅 overlay）*/}
+                                {caps.attachable && (
+                                    <ToggleField
+                                        label="允许手动附加"
+                                        checked={formData.Attachable}
+                                        onChange={v => set({ Attachable: v })}
+                                        isDark={isDark}
+                                    />
+                                )}
+                                {/* IPv6 */}
+                                {caps.ipv6 && (
+                                    <ToggleField
+                                        label="启用 IPv6"
+                                        checked={formData.EnableIPv6}
+                                        onChange={v => set({ EnableIPv6: v })}
+                                        isDark={isDark}
+                                    />
+                                )}
+                            </div>
+
+                            {/* 字段说明 */}
+                            <div className={`text-xs space-y-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                {caps.internal && <p>• <b>隔离外部访问</b>：容器只能与同网络内容器通信，无法访问互联网</p>}
+                                {caps.attachable && <p>• <b>允许手动附加</b>（overlay 专属）：普通容器可通过 <code className="font-mono">docker network connect</code> 加入此 Swarm 网络</p>}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── IPv4 子网配置 ── */}
+                    {caps.ipam && formData.EnableIPv4 && (
+                        <div className={`${sectionCls} space-y-3`}>
+                            <p className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                                IPv4 配置
+                                {(formData.Driver === 'macvlan' || formData.Driver === 'ipvlan') && (
+                                    <span className="ml-2 text-orange-400">（须与物理网络网段一致）</span>
+                                )}
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className={subLabelCls}>{t('network.ipv4_subnet')}</label>
                                     <input
                                         type="text"
-                                        placeholder="Key"
-                                        value={opt.key}
-                                        onChange={e => updateOption(idx, 'key', e.target.value)}
-                                        className={`flex-1 px-3 py-2 rounded border ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
+                                        placeholder={t('network.subnet_placeholder')}
+                                        value={formData.IPv4Subnet}
+                                        onChange={e => set({ IPv4Subnet: e.target.value })}
+                                        className={inputCls}
                                     />
-                                    <input
-                                        type="text"
-                                        placeholder="Value"
-                                        value={opt.value}
-                                        onChange={e => updateOption(idx, 'value', e.target.value)}
-                                        className={`flex-1 px-3 py-2 rounded border ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => removeOption(idx)}
-                                        className="p-2 text-red-500 hover:bg-red-500/10 rounded"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
                                 </div>
-                            ))}
-                            <button
-                                type="button"
-                                onClick={addOption}
-                                className={`w-full py-2 border border-dashed rounded-lg text-sm transition-colors ${isDark ? 'border-white/20 text-gray-400 hover:border-white/40 hover:text-white' : 'border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-700'}`}
-                            >
-                                + {t('network.add_option')}
-                            </button>
+                                <div className="space-y-1.5">
+                                    <label className={subLabelCls}>{t('network.ipv4_gateway')}</label>
+                                    <input
+                                        type="text"
+                                        placeholder={t('network.gateway_placeholder')}
+                                        value={formData.IPv4Gateway}
+                                        onChange={e => set({ IPv4Gateway: e.target.value })}
+                                        className={inputCls}
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    {/* ── IPv6 子网配置 ── */}
+                    {caps.ipv6 && formData.EnableIPv6 && (
+                        <div className={`${sectionCls} space-y-3`}>
+                            <p className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-purple-400' : 'text-purple-600'}`}>
+                                IPv6 配置
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className={subLabelCls}>{t('network.ipv6_subnet')}</label>
+                                    <input
+                                        type="text"
+                                        placeholder="例：2001:db8::/64"
+                                        value={formData.IPv6Subnet}
+                                        onChange={e => set({ IPv6Subnet: e.target.value })}
+                                        className={inputCls}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className={subLabelCls}>{t('network.ipv6_gateway')}</label>
+                                    <input
+                                        type="text"
+                                        placeholder="例：2001:db8::1"
+                                        value={formData.IPv6Gateway}
+                                        onChange={e => set({ IPv6Gateway: e.target.value })}
+                                        className={inputCls}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── 自定义驱动参数（高级，非 host/null 显示） ── */}
+                    {!isSimpleDriver && (
+                        <div className="space-y-2">
+                            <label className={labelCls}>{t('network.custom_driver_opts')}</label>
+                            <div className="space-y-2">
+                                {formData.Options.map((opt, idx) => (
+                                    <div key={idx} className="flex gap-2">
+                                        <input
+                                            type="text" placeholder="Key"
+                                            value={opt.key}
+                                            onChange={e => updateOption(idx, 'key', e.target.value)}
+                                            className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
+                                        />
+                                        <input
+                                            type="text" placeholder="Value"
+                                            value={opt.value}
+                                            onChange={e => updateOption(idx, 'value', e.target.value)}
+                                            className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
+                                        />
+                                        <button
+                                            type="button" onClick={() => removeOption(idx)}
+                                            className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button
+                                    type="button" onClick={addOption}
+                                    className={`w-full py-2 border border-dashed rounded-lg text-sm transition-colors ${isDark ? 'border-white/20 text-gray-400 hover:border-white/40' : 'border-gray-300 text-gray-500 hover:border-gray-400'}`}
+                                >
+                                    + {t('network.add_option')}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── 提交按钮 ── */}
+                    <div className={`flex justify-end gap-3 pt-4 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
                         <button
-                            type="button"
-                            onClick={onClose}
+                            type="button" onClick={onClose}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isDark ? 'hover:bg-white/10 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
                         >
                             {t('common.cancel')}
                         </button>
                         <button
-                            type="submit"
-                            className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white transition-colors"
+                            type="submit" disabled={submitting}
+                            className="px-6 py-2 rounded-lg text-sm font-medium bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white transition-colors"
                         >
-                            {t('common.confirm')}
+                            {submitting ? '创建中...' : t('common.confirm')}
                         </button>
                     </div>
                 </form>
@@ -537,6 +708,7 @@ function ToggleField({ label, checked, onChange, isDark, disabled }) {
         </div>
     );
 }
+
 
 function NavItem({ icon, label, active, onClick, isDark }) {
     return (
