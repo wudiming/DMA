@@ -16,7 +16,9 @@ import {
     Trash2,
     MoreVertical,
     Plus,
-    X
+    X,
+    Eye,
+    Info
 } from 'lucide-react';
 import axios from 'axios';
 import { useThemeStore } from '../store/themeStore';
@@ -32,6 +34,7 @@ export default function Networks() {
     const [networks, setNetworks] = useState([]);
     const [actionMenuId, setActionMenuId] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [detailNetwork, setDetailNetwork] = useState(null);
     const { refreshEndpoints, currentEndpoint } = useEndpoint();
 
     useEffect(() => {
@@ -178,6 +181,7 @@ export default function Networks() {
                                 actionMenuId={actionMenuId}
                                 setActionMenuId={setActionMenuId}
                                 handleRemove={handleRemove}
+                                onDetail={() => setDetailNetwork(network)}
                             />
                         ))
                     )}
@@ -190,15 +194,20 @@ export default function Networks() {
                 isDark={isDark}
                 onCreated={fetchNetworks}
             />
+            <NetworkDetailModal
+                network={detailNetwork}
+                isDark={isDark}
+                onClose={() => setDetailNetwork(null)}
+            />
         </div >
     );
 }
 
-function NetworkCard({ network, isDark, actionMenuId, setActionMenuId, handleRemove }) {
+function NetworkCard({ network, isDark, actionMenuId, setActionMenuId, handleRemove, onDetail }) {
     const { t } = useTranslation();
-    const showMenu = actionMenuId === network.Id;
     const created = new Date(network.Created).toLocaleDateString('zh-CN');
     const isSystemNetwork = ['bridge', 'host', 'none'].includes(network.Name);
+    const containerCount = Object.keys(network.Containers || {}).length;
 
     // 提取IP信息
     const ipv4Config = network.IPAM?.Config?.find(c => c.Subnet && !c.Subnet.includes(':'));
@@ -206,52 +215,218 @@ function NetworkCard({ network, isDark, actionMenuId, setActionMenuId, handleRem
     const ipv4 = ipv4Config ? ipv4Config.Subnet : '-';
     const ipv6 = ipv6Config ? ipv6Config.Subnet : '-';
 
+    // 驱动颜色
+    const driverColor = {
+        bridge: isDark ? 'text-teal-400 bg-teal-500/10' : 'text-teal-700 bg-teal-100',
+        macvlan: isDark ? 'text-orange-400 bg-orange-500/10' : 'text-orange-700 bg-orange-100',
+        ipvlan: isDark ? 'text-yellow-400 bg-yellow-500/10' : 'text-yellow-700 bg-yellow-100',
+        overlay: isDark ? 'text-blue-400 bg-blue-500/10' : 'text-blue-700 bg-blue-100',
+        host: isDark ? 'text-purple-400 bg-purple-500/10' : 'text-purple-700 bg-purple-100',
+        null: isDark ? 'text-gray-400 bg-gray-500/10' : 'text-gray-700 bg-gray-100',
+    }[network.Driver] || (isDark ? 'text-gray-400 bg-gray-500/10' : 'text-gray-700 bg-gray-100');
+
     return (
         <div className={`${isDark ? 'glass border-white/10' : 'bg-white border-gray-200 shadow-sm'} rounded-xl p-4 border transition-all hover:shadow-md`}>
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4 flex-1">
-                    <div className={`w-12 h-12 rounded-xl ${isDark ? 'bg-teal-500/20' : 'bg-teal-50'} flex items-center justify-center flex-shrink-0`}>
-                        <NetworkIcon className={`w-6 h-6 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} />
-                    </div>
+            <div className="flex items-center gap-4">
+                <div className={`w-11 h-11 rounded-xl ${isDark ? 'bg-teal-500/20' : 'bg-teal-50'} flex items-center justify-center flex-shrink-0`}>
+                    <NetworkIcon className={`w-5 h-5 ${isDark ? 'text-teal-400' : 'text-teal-600'}`} />
+                </div>
 
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                {network.Name}
-                            </h3>
-                            {isSystemNetwork && (
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-800'}`}>
-                                    {t('common.system')}
-                                </span>
-                            )}
-                        </div>
-                        <div className={`flex items-center gap-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                            <span className="font-mono">{t('network.driver')}: {network.Driver}</span>
-                            <span className="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
-                            <span>{t('network.scope')}: {network.Scope}</span>
-                            <span className="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
-                            <span className="font-mono">IPv4: {ipv4}</span>
-                            <span className="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                        <h3 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {network.Name}
+                        </h3>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-medium ${driverColor}`}>
+                            {network.Driver}
+                        </span>
+                        {isSystemNetwork && (
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-800'}`}>
+                                {t('common.system')}
+                            </span>
+                        )}
+                        {containerCount > 0 && (
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'}`}>
+                                {containerCount} 容器
+                            </span>
+                        )}
+                    </div>
+                    <div className={`flex items-center gap-3 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        <span>{t('network.scope')}: {network.Scope}</span>
+                        <span className="w-px h-3 bg-current opacity-30"></span>
+                        <span className="font-mono">IPv4: {ipv4}</span>
+                        {ipv6 !== '-' && <>
+                            <span className="w-px h-3 bg-current opacity-30"></span>
                             <span className="font-mono">IPv6: {ipv6}</span>
-                            <span className="w-px h-3 bg-gray-300 dark:bg-gray-700"></span>
-                            <span>{t('common.created')}: {created}</span>
+                        </>}
+                        <span className="w-px h-3 bg-current opacity-30"></span>
+                        <span>{created}</span>
+                    </div>
+                </div>
+
+                {/* 操作按钮 */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* 详情 */}
+                    <button
+                        onClick={onDetail}
+                        className={`p-2 rounded-lg transition-colors ${
+                            isDark ? 'text-gray-400 hover:text-gray-200 hover:bg-white/10' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                        }`}
+                        title="查看详情"
+                    >
+                        <Eye className="w-4 h-4" />
+                    </button>
+
+                    {/* 删除（仅非系统且无容器） */}
+                    {!isSystemNetwork && containerCount === 0 && (
+                        <button
+                            onClick={() => handleRemove(network)}
+                            className={`p-2 rounded-lg transition-colors ${
+                                isDark ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10' : 'text-red-500 hover:text-red-600 hover:bg-red-50'
+                            }`}
+                            title={t('common.delete')}
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── 网络详情弹窗（Docker 网络属性创建后不可修改，仅展示）─────────────────────
+function NetworkDetailModal({ network, isDark, onClose }) {
+    if (!network) return null;
+
+    const ipv4 = network.IPAM?.Config?.find(c => c.Subnet && !c.Subnet.includes(':'));
+    const ipv6 = network.IPAM?.Config?.find(c => c.Subnet && c.Subnet.includes(':'));
+    const containers = Object.entries(network.Containers || {});
+    const options = network.Options || {};
+    const labels = network.Labels || {};
+
+    const Row = ({ label, value }) => (
+        <div className={`flex items-start py-2 border-b last:border-0 ${
+            isDark ? 'border-white/5' : 'border-gray-100'
+        }`}>
+            <span className={`w-32 flex-shrink-0 text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{label}</span>
+            <span className={`text-sm font-mono break-all ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>{value || '-'}</span>
+        </div>
+    );
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className={`${
+                isDark ? 'glass border-white/20' : 'bg-white border-gray-200'
+            } rounded-xl w-full max-w-lg border shadow-2xl max-h-[85vh] overflow-y-auto`}>
+                {/* 标题 */}
+                <div className={`px-6 py-4 border-b flex items-center justify-between sticky top-0 ${
+                    isDark ? 'border-white/10 bg-gray-900/95' : 'border-gray-100 bg-white/95'
+                } backdrop-blur z-10`}>
+                    <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            isDark ? 'bg-teal-500/20' : 'bg-teal-50'
+                        }`}>
+                            <NetworkIcon className={`w-4 h-4 ${ isDark ? 'text-teal-400' : 'text-teal-600'}`} />
+                        </div>
+                        <div>
+                            <h2 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{network.Name}</h2>
+                            <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>网络详情</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className={`p-1.5 rounded-lg ${
+                        isDark ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+                    }`}>
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-5">
+                    {/* 不可编辑提示 */}
+                    <div className={`flex items-start gap-2.5 p-3 rounded-lg ${
+                        isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'
+                    }`}>
+                        <Info className={`w-4 h-4 flex-shrink-0 mt-0.5 ${ isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+                        <p className={`text-xs ${ isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                            Docker 网络创建后不支持修改驱动、子网、网关等核心属性。如需变更，请删除后重建。
+                        </p>
+                    </div>
+
+                    {/* 基础信息 */}
+                    <div>
+                        <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${ isDark ? 'text-gray-500' : 'text-gray-400'}`}>基础信息</p>
+                        <div className={`rounded-lg ${ isDark ? 'bg-white/5' : 'bg-gray-50'} px-4`}>
+                            <Row label="ID" value={network.Id?.slice(0, 12) + '...'} />
+                            <Row label="驱动" value={network.Driver} />
+                            <Row label="作用域" value={network.Scope} />
+                            <Row label="Internal" value={network.Internal ? '是（隔离外网）' : '否'} />
+                            <Row label="Attachable" value={network.Attachable ? '是' : '否'} />
+                            <Row label="IPv6" value={network.EnableIPv6 ? '启用' : '禁用'} />
+                            <Row label="创建时间" value={new Date(network.Created).toLocaleString('zh-CN')} />
                         </div>
                     </div>
 
-                    {!isSystemNetwork && (!network.Containers || Object.keys(network.Containers).length === 0) && (
-                        <div className="relative ml-4">
-                            <button
-                                onClick={() => handleRemove(network)}
-                                className={`p-2.5 rounded-lg ${isDark
-                                    ? 'hover:bg-red-500/10 text-red-400 hover:text-red-300'
-                                    : 'hover:bg-red-50 text-red-600 hover:text-red-700'
-                                    } transition-colors`}
-                                title={t('common.delete')}
-                            >
-                                <Trash2 className="w-5 h-5" />
-                            </button>
+                    {/* IPAM */}
+                    {(ipv4 || ipv6) && (
+                        <div>
+                            <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${ isDark ? 'text-gray-500' : 'text-gray-400'}`}>IP 地址管理（IPAM）</p>
+                            <div className={`rounded-lg ${ isDark ? 'bg-white/5' : 'bg-gray-50'} px-4`}>
+                                {ipv4 && <>
+                                    <Row label="IPv4 子网" value={ipv4.Subnet} />
+                                    {ipv4.Gateway && <Row label="IPv4 网关" value={ipv4.Gateway} />}
+                                    {ipv4.IPRange && <Row label="IP 范围" value={ipv4.IPRange} />}
+                                </>}
+                                {ipv6 && <>
+                                    <Row label="IPv6 子网" value={ipv6.Subnet} />
+                                    {ipv6.Gateway && <Row label="IPv6 网关" value={ipv6.Gateway} />}
+                                </>}
+                            </div>
                         </div>
                     )}
+
+                    {/* 驱动选项 */}
+                    {Object.keys(options).length > 0 && (
+                        <div>
+                            <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${ isDark ? 'text-gray-500' : 'text-gray-400'}`}>驱动选项</p>
+                            <div className={`rounded-lg ${ isDark ? 'bg-white/5' : 'bg-gray-50'} px-4`}>
+                                {Object.entries(options).map(([k, v]) => (
+                                    <Row key={k} label={k} value={String(v)} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 连接的容器 */}
+                    <div>
+                        <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${ isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                            已连接容器（{containers.length}）
+                        </p>
+                        {containers.length === 0 ? (
+                            <p className={`text-sm ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>无容器连接</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {containers.map(([id, info]) => (
+                                    <div key={id} className={`p-3 rounded-lg ${ isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
+                                        <p className={`text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                                            {info.Name?.replace(/^\//, '') || id.slice(0, 12)}
+                                        </p>
+                                        <p className={`text-xs font-mono mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                            IPv4: {info.IPv4Address || '-'}  |  MAC: {info.MacAddress || '-'}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className={`px-6 py-4 border-t ${ isDark ? 'border-white/10' : 'border-gray-100'}`}>
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600 transition-all"
+                    >
+                        关闭
+                    </button>
                 </div>
             </div>
         </div>
@@ -396,9 +571,10 @@ function CreateNetworkModal({ isOpen, onClose, isDark, onCreated }) {
     const removeOption = (idx) => set({ Options: formData.Options.filter((_, i) => i !== idx) });
 
     // 样式快捷
-    const inputCls = `w-full px-4 py-2.5 rounded-lg border ${isDark
-        ? 'bg-black/20 border-white/10 text-white placeholder-gray-500'
-        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
+    const inputCls = `w-full px-4 py-2.5 rounded-lg border ${
+        isDark
+            ? 'bg-gray-800/50 border-white/10 text-gray-100 placeholder-gray-500 [&>option]:bg-gray-800'
+            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
     } focus:ring-2 focus:ring-blue-500/50 outline-none transition-all`;
 
     const sectionCls = `p-4 rounded-lg border ${isDark
@@ -638,7 +814,15 @@ function CreateNetworkModal({ isOpen, onClose, isDark, onCreated }) {
                     {/* ── 自定义驱动参数（高级，非 host/null 显示） ── */}
                     {!isSimpleDriver && (
                         <div className="space-y-2">
-                            <label className={labelCls}>{t('network.custom_driver_opts')}</label>
+                            <div className="flex items-start justify-between gap-3">
+                                <label className={labelCls}>{t('network.custom_driver_opts')}</label>
+                                <div className={`text-xs leading-relaxed max-w-xs ${ isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                    传递给驱动的额外参数，对应 CLI 的 <code className="font-mono bg-gray-500/10 px-1 rounded">--opt key=value</code>。
+                                    {formData.Driver === 'bridge' && <span> 如：<code className="font-mono">com.docker.network.bridge.name=br0</code></span>}
+                                    {formData.Driver === 'overlay' && <span> 如：<code className="font-mono">encrypted=true</code>（加密流量）</span>}
+                                    {(formData.Driver === 'macvlan' || formData.Driver === 'ipvlan') && <span> macvlan/ipvlan 的 parent 和 mode 已在上方专属字段填写，此处无需重复。</span>}
+                                </div>
+                            </div>
                             <div className="space-y-2">
                                 {formData.Options.map((opt, idx) => (
                                     <div key={idx} className="flex gap-2">
@@ -646,13 +830,13 @@ function CreateNetworkModal({ isOpen, onClose, isDark, onCreated }) {
                                             type="text" placeholder="Key"
                                             value={opt.key}
                                             onChange={e => updateOption(idx, 'key', e.target.value)}
-                                            className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
+                                            className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-gray-900/80 border-white/10 text-gray-100' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
                                         />
                                         <input
                                             type="text" placeholder="Value"
                                             value={opt.value}
                                             onChange={e => updateOption(idx, 'value', e.target.value)}
-                                            className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-black/20 border-white/10 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
+                                            className={`flex-1 px-3 py-2 rounded-lg border text-sm ${isDark ? 'bg-gray-900/80 border-white/10 text-gray-100' : 'bg-white border-gray-300'} focus:outline-none focus:border-blue-500`}
                                         />
                                         <button
                                             type="button" onClick={() => removeOption(idx)}

@@ -154,6 +154,8 @@ export default function UniversalTreeMap({
     onItemClick
 }) {
     const { t } = useTranslation();
+    // 内部总是用标准坐标系，通过 viewBox + width="100%" 实现自适应
+    const logicalW = 900;
 
     const treeMapData = useMemo(() => {
         if (!data || data.length === 0) return [];
@@ -185,14 +187,14 @@ export default function UniversalTreeMap({
             }));
         }
 
-        return squarify(processedData, 0, 0, width, height);
-    }, [data, type, width, height]);
+        return squarify(processedData, 0, 0, logicalW, height);
+    }, [data, type, logicalW, height]);
 
     if (!data || data.length === 0) {
         return (
             <div
                 className={`flex items-center justify-center ${isDark ? 'bg-gray-800/50' : 'bg-gray-100'} rounded-lg`}
-                style={{ width, height }}
+                style={{ height }}
             >
                 <p className={isDark ? 'text-gray-500' : 'text-gray-400'}>
                     {t('common.no_data')}
@@ -202,7 +204,7 @@ export default function UniversalTreeMap({
     }
 
     return (
-        <svg width={width} height={height} className="rounded-lg">
+        <svg width="100%" height={height} viewBox={`0 0 ${logicalW} ${height}`} preserveAspectRatio="none" className="rounded-lg" style={{ display: 'block' }}>
             {treeMapData.map((item) => {
                 const textSize = Math.min(item.width, item.height) > 80 ? 14 :
                     Math.min(item.width, item.height) > 50 ? 12 : 10;

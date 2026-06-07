@@ -9,14 +9,14 @@
 - 📊 **系统概览**：实时监控 CPU、内存、网络和磁盘使用情况
 - 🐳 **容器管理**：Unraid 风格交互，支持一键更新、日志查看、终端连接
 - 🛠️ **高级容器配置**：支持 Entrypoint、CMD、Capabilities（复选框）、Devices、Sysctls 等高级参数，并自动保存为用户模板
-- 📝 **Docker 命令解析**：支持将复杂 `docker run` 命令（含 WebUI/Icon 标签、Entrypoint、CMD 参数）一键转为表单
+- 📝 **命令模式**：支持 `docker run` 命令一键解析填入表单或直接运行；支持单容器 Compose YAML 解析填入表单
 - 🌐 **WebUI 快速访问**：自动根据节点 IP 和端口映射填充 WebUI 地址
 - 🤖 **Agent 远程管理**：通过安全的 Agent 模式管理远程 Docker 节点
 - 🔄 **自我更新**：支持一键更新 DMA 自身
 - 🖼️ **镜像管理**：拉取、删除、更新后自动清理旧版本镜像（单容器/编排统一策略）
 - 📦 **Compose 编排**：支持在线编辑和部署 Docker Compose
 - 💾 **存储卷管理**：创建、删除和查看卷详情
-- 🌐 **网络管理**：管理 Docker 网络
+- 🌐 **网络管理**：驱动感知的网络创建 UI（bridge/macvlan/ipvlan/overlay/host/null），支持查看网络详情和已连接容器
 
 
 ## 🚀 快速开始

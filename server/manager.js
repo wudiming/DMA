@@ -1728,6 +1728,188 @@ app.delete('/api/volumes/:name', async (req, res) => {
   }
 });
 
+// ==================== Compose 解析 ====================
+
+app.post('/api/parse-compose', (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: '内容不能为空' });
+    }
+
+    // 尝试解析为 YAML（兼容 JSON）
+    let parsed;
+    try {
+      parsed = yaml.load(content);
+    } catch (e) {
+      return res.status(400).json({ error: `YAML 解析失败: ${e.message}` });
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      return res.status(400).json({ error: '无效的 Compose 格式' });
+    }
+
+    // 支持两种格式：
+    // 1. 完整 Compose: { services: { serviceName: { ... } } }
+    // 2. 单服务对象（直接贴服务配置）: { image: '...', ports: [...] }
+    let serviceDef = null;
+    let serviceName = '';
+
+    if (parsed.services && typeof parsed.services === 'object') {
+      const serviceNames = Object.keys(parsed.services);
+      if (serviceNames.length === 0) {
+        return res.status(400).json({ error: 'services 为空' });
+      }
+      if (serviceNames.length > 1) {
+        return res.status(400).json({ error: `包含 ${serviceNames.length} 个服务，仅支持单服务解析。请只保留一个服务的配置。` });
+      }
+      serviceName = serviceNames[0];
+      serviceDef = parsed.services[serviceName];
+    } else if (parsed.image || parsed.build) {
+      // 直接是服务配置
+      serviceDef = parsed;
+    } else {
+      return res.status(400).json({ error: '未找到有效的服务配置（需要 services 字段或直接提供服务配置）' });
+    }
+
+    // 解析服务配置 → 容器字段
+    const result = {
+      name: '',
+      image: '',
+      ports: [],
+      volumes: [],
+      env: [],
+      restart: 'no',
+      network: 'bridge',
+      entrypoint: '',
+      cmd: '',
+      capAdd: [],
+      devices: [],
+      sysctls: {},
+      iconUrl: '',
+      webUi: ''
+    };
+
+    // 容器名
+    result.name = serviceDef.container_name || serviceName || '';
+
+    // 镜像
+    result.image = serviceDef.image || '';
+
+    // 端口: ["8080:80", "443:443"] 或 [{ published: 80, target: 80 }]
+    if (Array.isArray(serviceDef.ports)) {
+      result.ports = serviceDef.ports.map(p => {
+        if (typeof p === 'string') return p;
+        if (typeof p === 'object') {
+          const pub = p.published || p.host_ip || '';
+          const tgt = p.target || '';
+          const proto = p.protocol ? `/${p.protocol}` : '';
+          return pub ? `${pub}:${tgt}${proto}` : `${tgt}${proto}`;
+        }
+        return String(p);
+      }).filter(Boolean);
+    }
+
+    // 卷: ["/host:/container", { source, target }]
+    if (Array.isArray(serviceDef.volumes)) {
+      result.volumes = serviceDef.volumes.map(v => {
+        if (typeof v === 'string') return v;
+        if (typeof v === 'object' && v.source && v.target) {
+          const opts = v.read_only ? ':ro' : '';
+          return `${v.source}:${v.target}${opts}`;
+        }
+        return null;
+      }).filter(Boolean);
+    }
+
+    // 环境变量: ["KEY=VAL"] 或 { KEY: VAL }
+    if (Array.isArray(serviceDef.environment)) {
+      result.env = serviceDef.environment.map(e => String(e)).filter(Boolean);
+    } else if (serviceDef.environment && typeof serviceDef.environment === 'object') {
+      result.env = Object.entries(serviceDef.environment)
+        .map(([k, v]) => v !== null && v !== undefined ? `${k}=${v}` : k)
+        .filter(Boolean);
+    }
+
+    // 重启策略
+    if (serviceDef.restart) {
+      // compose 的 on-failure 可能带参数
+      const restartMap = { 'no': 'no', 'always': 'always', 'unless-stopped': 'unless-stopped', 'on-failure': 'on-failure' };
+      const rawRestart = String(serviceDef.restart).split(':')[0];
+      result.restart = restartMap[rawRestart] || 'no';
+    }
+
+    // 网络
+    if (serviceDef.network_mode) {
+      result.network = serviceDef.network_mode;
+    } else if (serviceDef.networks) {
+      const nets = Array.isArray(serviceDef.networks)
+        ? serviceDef.networks
+        : Object.keys(serviceDef.networks);
+      if (nets.length > 0) result.network = nets[0];
+    }
+
+    // Entrypoint
+    if (serviceDef.entrypoint) {
+      if (Array.isArray(serviceDef.entrypoint)) {
+        result.entrypoint = serviceDef.entrypoint.join(' ');
+      } else {
+        result.entrypoint = String(serviceDef.entrypoint);
+      }
+    }
+
+    // Command
+    if (serviceDef.command) {
+      if (Array.isArray(serviceDef.command)) {
+        result.cmd = serviceDef.command.join(' ');
+      } else {
+        result.cmd = String(serviceDef.command);
+      }
+    }
+
+    // Cap Add
+    if (Array.isArray(serviceDef.cap_add)) {
+      result.capAdd = serviceDef.cap_add.map(String);
+    }
+
+    // Devices: ["/dev/snd:/dev/snd", { PathOnHost, PathInContainer }]
+    if (Array.isArray(serviceDef.devices)) {
+      result.devices = serviceDef.devices.map(d => {
+        if (typeof d === 'string') {
+          const parts = d.split(':');
+          return { PathOnHost: parts[0], PathInContainer: parts[1] || parts[0], CgroupPermissions: parts[2] || 'rwm' };
+        }
+        return d;
+      }).filter(d => d.PathOnHost);
+    }
+
+    // Sysctls: { key: value } 或 ["key=value"]
+    if (Array.isArray(serviceDef.sysctls)) {
+      const sc = {};
+      serviceDef.sysctls.forEach(s => {
+        const [k, v] = String(s).split('=');
+        if (k) sc[k] = v || '';
+      });
+      result.sysctls = sc;
+    } else if (serviceDef.sysctls && typeof serviceDef.sysctls === 'object') {
+      result.sysctls = serviceDef.sysctls;
+    }
+
+    // Labels → 提取 DMA 自定义标签
+    const labels = serviceDef.labels || {};
+    const labelObj = Array.isArray(labels)
+      ? Object.fromEntries(labels.map(l => l.split('=')))
+      : labels;
+    if (labelObj.ICON_URL) result.iconUrl = labelObj.ICON_URL;
+    if (labelObj.WEBUI_URL) result.webUi = labelObj.WEBUI_URL;
+
+    res.json({ ok: true, data: result, serviceName });
+  } catch (err) {
+    console.error('[parse-compose]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==================== 网络管理 ====================
 
 app.get('/api/networks', async (req, res) => {

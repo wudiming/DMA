@@ -1,5 +1,48 @@
 # 更新日志
 
+## [1.2.0] - 2026-06-07
+
+### 新增
+
+- **Compose YAML 解析填入表单**：命令模式新增 Compose 解析功能
+  - 命令模式内新增 `Docker Run / Compose` 子模式切换器（分段控件样式）
+  - Compose 区块：粘贴单容器 Compose YAML（支持完整 compose 文件含单 service 或直接粘贴服务配置块）→ 点击「解析并填入表单」自动填充所有字段后切换至表单模式
+  - Docker Run 区块：保留原有「解析并填入表单」+「直接运行」功能，布局优化，移除冗余取消按钮
+  - 后端新增 `/api/parse-compose` 接口（使用已内置的 `js-yaml`），支持解析：image、container_name、ports、volumes、environment（数组/对象格式）、restart、network_mode/networks、entrypoint、command、cap_add、devices、sysctls、labels（ICON_URL/WEBUI_URL）
+  - 自定义网络自动识别并回填 customNetwork 状态
+
+- **网络详情弹窗**：NetworkCard 新增「眼睛」详情按钮
+  - 展示：ID、驱动、作用域、Internal/Attachable/IPv6、创建时间
+  - IPAM：IPv4/IPv6 子网 + 网关
+  - 驱动选项（Options）列表
+  - 已连接容器（名称、IPv4、MAC）
+  - 顶部说明：Docker 网络创建后核心属性不可修改，如需变更请删除重建
+
+### 修复
+
+- **用量统计图表色块穿透**：仪表板 TreeMap 图表使用固定像素宽度（1120px）超出容器范围，导致色块覆盖右侧统计卡片
+  - ContainerTreeMap 改为 `width="100%" viewBox="0 0 900 h"` 自适应容器宽度
+  - 容器 div 增加 `overflow-hidden` 防止溢出
+
+### 改进
+
+- **暗黑模式下拉菜单统一风格**：全站所有 `<select>` 统一采用半透明玻璃态风格 `bg-gray-800/50 border-white/10`，与整体 glassmorphism 协调
+  - 涉及：创建容器模态框（模板选择器、重启策略、网络模式）、创建网络模态框（驱动选择器、子模式选择器）
+
+- **网络卡片视觉升级**：
+  - 驱动类型以彩色徽章展示（bridge=teal、macvlan=orange、ipvlan=yellow、overlay=blue、host=purple）
+  - 新增「已连接容器数」徽章（连接时显示）
+  - IPv6 信息仅在配置了 IPv6 子网时显示，减少冗余
+  - 操作按钮区：详情眼睛图标 + 删除图标，布局更紧凑
+
+- **自定义驱动配置说明**：创建网络弹窗中「自定义驱动配置」区域新增内联说明
+  - 解释该字段等价于 `--opt key=value`，并根据当前驱动给出具体示例
+  - bridge: `com.docker.network.bridge.name=br0`
+  - overlay: `encrypted=true`（加密流量）
+  - macvlan/ipvlan: 提示 parent 和 mode 已在上方专属字段设置无需重复
+
+---
+
 ## [1.1.9] - 2026-06-07
 
 ### 修复

@@ -10,6 +10,9 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
     const { t } = useTranslation();
     const [mode, setMode] = useState('form'); // 'form' | 'command'
     const [command, setCommand] = useState('');
+    const [composeContent, setComposeContent] = useState('');
+    const [composeError, setComposeError] = useState('');
+    const [commandSubMode, setCommandSubMode] = useState('dockerrun'); // 'dockerrun' | 'compose'
     const [formData, setFormData] = useState({
         name: '',
         image: '',
@@ -812,18 +815,87 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             {mode === 'command' ? (
                                 <div className="p-6 space-y-4">
-                                    <div className={`p-4 rounded-lg ${isDark ? 'bg-white/5' : 'bg-gray-50'}`}>
-                                        <p className={`text-sm mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                            {t('container.command_placeholder')}
-                                        </p>
-                                        <textarea
-                                            value={command}
-                                            onChange={(e) => setCommand(e.target.value)}
-                                            placeholder="docker run -d --name my-app -p 8080:80 nginx:latest"
-                                            className={`w-full h-40 p-4 rounded-lg font-mono text-sm ${isDark ? 'bg-black/30 text-white' : 'bg-white border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                                        />
+                                    {/* 子模式切换：docker run / compose */}
+                                    <div className={`flex rounded-lg p-1 gap-1 ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCommandSubMode('dockerrun')}
+                                            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                                                commandSubMode === 'dockerrun'
+                                                    ? (isDark ? 'bg-gray-700 text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm')
+                                                    : (isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')
+                                            }`}
+                                        >
+                                            <Terminal className="w-3.5 h-3.5" />
+                                            Docker Run
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setCommandSubMode('compose'); setComposeError(''); }}
+                                            className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                                                commandSubMode === 'compose'
+                                                    ? (isDark ? 'bg-gray-700 text-white shadow-sm' : 'bg-white text-gray-900 shadow-sm')
+                                                    : (isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')
+                                            }`}
+                                        >
+                                            <Layout className="w-3.5 h-3.5" />
+                                            Compose
+                                        </button>
                                     </div>
-                                    {/* Buttons moved to footer */}
+
+                                    {/* Docker Run 区块 */}
+                                    {commandSubMode === 'dockerrun' && (
+                                        <div className={`rounded-xl border ${isDark ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
+                                            <div className={`px-4 py-2.5 border-b flex items-center gap-2 ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+                                                <Terminal className={`w-4 h-4 ${isDark ? 'text-cyan-400' : 'text-cyan-600'}`} />
+                                                <span className={`text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>docker run 命令</span>
+                                                <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'}`}>支持直接运行</span>
+                                            </div>
+                                            <div className="p-4">
+                                                <p className={`text-xs mb-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                    粘贴完整的 docker run 命令，可解析填入表单或直接运行
+                                                </p>
+                                                <textarea
+                                                    value={command}
+                                                    onChange={(e) => setCommand(e.target.value)}
+                                                    placeholder="docker run -d --name my-app -p 8080:80 nginx:latest"
+                                                    className={`w-full h-36 p-3 rounded-lg font-mono text-sm resize-none ${
+                                                        isDark ? 'bg-black/30 text-white placeholder-gray-600 border border-white/5' : 'bg-white border border-gray-200 text-gray-900 placeholder-gray-400'
+                                                    } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Compose 区块 */}
+                                    {commandSubMode === 'compose' && (
+                                        <div className={`rounded-xl border ${isDark ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
+                                            <div className={`px-4 py-2.5 border-b flex items-center gap-2 ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+                                                <Layout className={`w-4 h-4 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} />
+                                                <span className={`text-sm font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>Compose 配置（单服务）</span>
+                                                <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'}`}>仅解析填入表单</span>
+                                            </div>
+                                            <div className="p-4 space-y-3">
+                                                <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                    粘贴单容器 Compose YAML，解析后填入表单。支持完整 compose 文件（只含单个 service）或直接贴服务配置块。
+                                                </p>
+                                                <textarea
+                                                    value={composeContent}
+                                                    onChange={(e) => { setComposeContent(e.target.value); setComposeError(''); }}
+                                                    placeholder={`services:\n  myapp:\n    image: nginx:latest\n    ports:\n      - "8080:80"\n    volumes:\n      - /data:/data\n    restart: always`}
+                                                    className={`w-full h-52 p-3 rounded-lg font-mono text-sm resize-none ${
+                                                        isDark ? 'bg-black/30 text-white placeholder-gray-600 border border-white/5' : 'bg-white border border-gray-200 text-gray-900 placeholder-gray-400'
+                                                    } focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                                                />
+                                                {composeError && (
+                                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                                                        <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                                                        <p className="text-xs text-red-400">{composeError}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <form id="create-container-form" onSubmit={handleSubmit} className="h-full flex flex-col">
@@ -856,7 +928,11 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                         <select
                                                             value={selectedTemplate}
                                                             onChange={handleTemplateSelect}
-                                                            className={`flex-1 px-3 py-1.5 text-sm rounded-md ${isDark ? 'bg-gray-800 border-white/10 text-white [&>option]:bg-gray-800' : 'bg-white border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                            className={`flex-1 px-3 py-1.5 text-sm rounded-md border ${
+                                                                isDark
+                                                                    ? 'bg-gray-800/50 border-white/10 text-gray-100 [&>option]:bg-gray-800'
+                                                                    : 'bg-white border-gray-200 text-gray-900'
+                                                            } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                                                         >
                                                             <option value="">{t('container.no_template')}</option>
                                                             {templates.map(t => (
@@ -995,7 +1071,11 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     <select
                                                         value={formData.restart}
                                                         onChange={(e) => setFormData({ ...formData, restart: e.target.value })}
-                                                        className={`w-full px-4 py-2 rounded-lg ${isDark ? 'bg-gray-800 border-white/10 text-white [&>option]:bg-gray-800' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                        className={`w-full px-4 py-2 rounded-lg border ${
+                                                            isDark
+                                                                ? 'bg-gray-800/50 border-white/10 text-gray-100 [&>option]:bg-gray-800'
+                                                                : 'bg-gray-50 border-gray-200 text-gray-900'
+                                                        } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                                                     >
                                                         <option value="no">{t('common.restart_no')}</option>
                                                         <option value="always">{t('common.restart_always')}</option>
@@ -1016,7 +1096,11 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     <select
                                                         value={formData.network}
                                                         onChange={(e) => setFormData({ ...formData, network: e.target.value })}
-                                                        className={`w-full px-4 py-2 rounded-lg ${isDark ? 'bg-gray-800 border-white/10 text-white [&>option]:bg-gray-800' : 'bg-gray-50 border border-gray-200 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                                                        className={`w-full px-4 py-2 rounded-lg border ${
+                                                            isDark
+                                                                ? 'bg-gray-800/50 border-white/10 text-gray-100 [&>option]:bg-gray-800'
+                                                                : 'bg-gray-50 border-gray-200 text-gray-900'
+                                                        } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                                                     >
                                                         <option value="bridge">{t('common.network_bridge')}</option>
                                                         <option value="host">{t('common.network_host')}</option>
@@ -1378,14 +1462,18 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                 >
                                     {loading ? (isEdit ? t('container.rebuilding') : t('container.creating')) : (isEdit ? t('container.rebuild_title') : t('container.create_title'))}
                                 </button>
-                                {mode === 'command' && (
+                                {mode === 'command' && commandSubMode === 'dockerrun' && (
                                     <>
                                         <button
                                             type="button"
                                             onClick={parseDockerCommand}
-                                            className={`flex-1 px-4 py-3 rounded-lg font-medium ${isDark ? 'glass glass-hover text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+                                            className={`flex-1 px-4 py-3 rounded-lg font-medium border transition-colors ${
+                                                isDark
+                                                    ? 'border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10'
+                                                    : 'border-cyan-300 text-cyan-600 hover:bg-cyan-50'
+                                            }`}
                                         >
-                                            {t('container.parse_command')}
+                                            解析并填入表单
                                         </button>
                                         <button
                                             type="button"
@@ -1396,11 +1484,61 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     if (submitBtn) submitBtn.click();
                                                 }, 100);
                                             }}
-                                            className="flex-1 px-4 py-3 rounded-lg font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 shadow-lg shadow-cyan-500/20"
+                                            className="flex-1 px-4 py-3 rounded-lg font-medium text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 shadow-lg shadow-cyan-500/20 transition-all"
                                         >
-                                            {t('container.run_directly')}
+                                            直接运行
                                         </button>
                                     </>
+                                )}
+                                {mode === 'command' && commandSubMode === 'compose' && (
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!composeContent.trim()) {
+                                                setComposeError('请先输入 Compose 配置');
+                                                return;
+                                            }
+                                            try {
+                                                const res = await axios.post('/api/parse-compose', { content: composeContent });
+                                                const d = res.data.data;
+                                                // 填入表单
+                                                const builtins = ['bridge','host','none'];
+                                                const isCustomNet = d.network && !builtins.includes(d.network);
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    name: d.name || prev.name,
+                                                    image: d.image || prev.image,
+                                                    ports: d.ports?.length ? d.ports : prev.ports,
+                                                    volumes: d.volumes?.length ? d.volumes : prev.volumes,
+                                                    env: d.env?.length ? d.env : prev.env,
+                                                    restart: d.restart || prev.restart,
+                                                    network: isCustomNet ? 'custom' : (d.network || 'bridge'),
+                                                    entrypoint: d.entrypoint || prev.entrypoint,
+                                                    cmd: d.cmd || prev.cmd,
+                                                    capAdd: d.capAdd?.length ? d.capAdd : prev.capAdd,
+                                                    devices: d.devices?.length ? d.devices : prev.devices,
+                                                    sysctls: d.sysctls && Object.keys(d.sysctls).length
+                                                        ? Object.entries(d.sysctls).map(([k,v]) => `${k}=${v}`)
+                                                        : prev.sysctls,
+                                                    iconUrl: d.iconUrl || prev.iconUrl,
+                                                    webUi: d.webUi || prev.webUi,
+                                                    alwaysPull: false,
+                                                }));
+                                                if (isCustomNet) setCustomNetwork(d.network);
+                                                if (d.iconUrl) setShowIconInput(true);
+                                                if (d.webUi) setShowWebUiInput(true);
+                                                setComposeError('');
+                                                // 切回表单模式
+                                                setMode('form');
+                                                setActiveTab('general');
+                                            } catch (err) {
+                                                setComposeError(err.response?.data?.error || err.message || '解析失败');
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 rounded-lg font-medium text-white bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 shadow-lg shadow-purple-500/20 transition-all"
+                                    >
+                                        解析并填入表单
+                                    </button>
                                 )}
                             </div>
                         </div>

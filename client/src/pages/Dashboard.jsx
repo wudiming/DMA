@@ -332,7 +332,7 @@ export default function Dashboard() {
                             <TabButton label={t('nav.volumes')} active={activeTab === 'volumes'} onClick={() => setActiveTab('volumes')} isDark={isDark} />
                         </div>
 
-                        <div className="w-full relative">
+                        <div className="w-full overflow-hidden relative">
                             {/* 容器 Tab 首次加载时的占位提示 */}
                             {activeTab === 'containers' && containerStatsLoading && containerStats.length === 0 && (
                                 <div className={`absolute inset-0 flex flex-col items-center justify-center rounded-lg z-10 ${isDark ? 'bg-gray-900/80' : 'bg-white/80'}`} style={{ height: 495 }}>
@@ -347,7 +347,7 @@ export default function Dashboard() {
                             <UniversalTreeMap
                                 data={getCurrentTreeMapData()}
                                 type={activeTab === 'containers' ? 'container' : activeTab === 'images' ? 'image' : 'volume'}
-                                width={1120}
+                                width={null}
                                 height={495}
                                 isDark={isDark}
                                 onItemClick={(item) => {
