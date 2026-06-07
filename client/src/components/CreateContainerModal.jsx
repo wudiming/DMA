@@ -85,7 +85,11 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 alwaysPull: false,
                 entrypoint: initialData.entrypoint || '',
                 cmd: initialData.cmd || '',
-                capAdd: initialData.capAdd || [],
+                capAdd: (initialData.capAdd || []).map(c =>
+                    // Docker API 返回的格式带 CAP_ 前缀（如 CAP_NET_ADMIN）而复选框使用无前缀格式（NET_ADMIN）
+                    // 统一去掉 CAP_ 前缀，避免重建时重复添加
+                    c.startsWith('CAP_') ? c.slice(4) : c
+                ),
                 devices: initialData.devices || [],
                 sysctls: initialData.sysctls || [],
                 privileged: initialData.privileged || false,
@@ -193,19 +197,24 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
 
         const template = templates.find(t => t.id === templateId);
         if (template) {
+            const tData = template.data;
             setFormData({
                 ...defaultData,
-                ...template.data,
+                ...tData,
                 // Ensure arrays are initialized
-                ports: template.data.ports || [],
-                volumes: template.data.volumes || [],
-                env: template.data.env || [],
-                capAdd: template.data.capAdd || [],
-                devices: template.data.devices || [],
-                sysctls: template.data.sysctls || []
+                ports: tData.ports || [],
+                volumes: tData.volumes || [],
+                env: tData.env || [],
+                capAdd: (tData.capAdd || []).map(c => c.startsWith('CAP_') ? c.slice(4) : c),
+                devices: tData.devices || [],
+                sysctls: tData.sysctls || [],
+                privileged: tData.privileged || false,
             });
-            if (template.data.iconUrl) setShowIconInput(true);
-            if (template.data.webUi) setShowWebUiInput(true);
+            // 回填自定义网络名和静态 IP（独立 state）
+            if (tData.customNetwork) setCustomNetwork(tData.customNetwork);
+            if (tData.networkIp) setNetworkIp(tData.networkIp);
+            if (tData.iconUrl) setShowIconInput(true);
+            if (tData.webUi) setShowWebUiInput(true);
         }
     };
 
@@ -421,6 +430,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 const tokens = log.message.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
                 const lines = [];
                 let currentLine = [];
+                let imageEncountered = false;
 
                 tokens.forEach((token, i) => {
                     if (i === 0 && token === 'docker') {
@@ -435,14 +445,28 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                     }
 
                     if (token.startsWith('-')) {
-                        if (currentLine.length > 0) {
-                            lines.push(currentLine);
+                        // 如果 image 已经出现过，后面的就是 CMD 参数，每个独占一行
+                        if (imageEncountered) {
+                            if (currentLine.length > 0) lines.push(currentLine);
+                            currentLine = [token];
+                        } else {
+                            if (currentLine.length > 0) lines.push(currentLine);
+                            currentLine = [token];
                         }
-                        currentLine = [token];
                     } else {
-                        // Check if it looks like an image (contains / or : and is not a flag value)
-                        // Simple heuristic: if it's the last token and doesn't start with -, put it on new line
-                        if (i === tokens.length - 1 && !token.startsWith('-') && lines.length > 0) {
+                        if (!imageEncountered && currentLine.length > 0 && !currentLine[currentLine.length - 1].startsWith('-')) {
+                            // 当前 currentLine 最后一个 token 不是 flag（说明它就是上一个専名的值），则此 token 开始新行
+                            lines.push(currentLine);
+                            currentLine = [token];
+                            imageEncountered = true;
+                        } else if (!imageEncountered && currentLine.length === 1 && currentLine[0].startsWith('-') && !currentLine[0].startsWith('--')) {
+                            // 短 flag （如 -d）的值
+                            currentLine.push(token);
+                        } else if (!imageEncountered && currentLine.length === 1 && currentLine[0].startsWith('--')) {
+                            // 长 flag 的值——检查下一个 token 是否是新 flag 或 image
+                            currentLine.push(token);
+                        } else if (imageEncountered) {
+                            // image 后面的 CMD，独占一行
                             if (currentLine.length > 0) lines.push(currentLine);
                             currentLine = [token];
                         } else {
@@ -452,16 +476,31 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 });
                 if (currentLine.length > 0) lines.push(currentLine);
 
+                // 最终渲染：image 行特殊高亮（白色加粗）、flag 黄色、其他灰色
+                const isImageLine = (lineTokens) =>
+                    lineTokens.length === 1 &&
+                    !lineTokens[0].startsWith('-') &&
+                    (lineTokens[0].includes('/') || lineTokens[0].includes(':'));
+
                 return (
                     <div key={index} className={`pl-4 mb-4 font-mono text-sm break-all p-3 rounded-lg border ${isDark ? 'bg-black/30 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
                         <div className={`space-y-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                             {lines.map((lineTokens, i) => (
                                 <div key={i} className={`${i > 0 ? 'pl-4' : ''}`}>
-                                    {lineTokens.map((token, j) => (
-                                        <span key={j} className={`mr-2 ${i === 0 ? (isDark ? 'text-cyan-400 font-bold' : 'text-cyan-600 font-bold') : (token.startsWith('-') ? (isDark ? 'text-yellow-500' : 'text-yellow-600') : (isDark ? 'text-gray-300' : 'text-gray-700'))}`}>
-                                            {token}
-                                        </span>
-                                    ))}
+                                    {lineTokens.map((token, j) => {
+                                        const isFlag = token.startsWith('-');
+                                        const isImg = isImageLine(lineTokens);
+                                        return (
+                                            <span key={j} className={`mr-2 ${
+                                                i === 0 ? (isDark ? 'text-cyan-400 font-bold' : 'text-cyan-600 font-bold')
+                                                : isImg ? (isDark ? 'text-white font-semibold' : 'text-gray-900 font-semibold')
+                                                : isFlag ? (isDark ? 'text-yellow-400' : 'text-yellow-600')
+                                                : (isDark ? 'text-gray-300' : 'text-gray-600')
+                                            }`}>
+                                                {token}
+                                            </span>
+                                        );
+                                    })}
                                 </div>
                             ))}
                         </div>
@@ -600,11 +639,16 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
             };
 
 
-            // 自动保存为模板
+            // 自动保存为模板（含自定义网络名和静态IP）
             try {
                 await axios.post('/api/templates/user', {
                     name: formData.name,
-                    data: formData
+                    data: {
+                        ...formData,
+                        // customNetwork 和 networkIp 是独立 state，需显式合入
+                        customNetwork: formData.network === 'custom' ? customNetwork : '',
+                        networkIp: (formData.network === 'custom' && networkIp.trim()) ? networkIp.trim() : '',
+                    }
                 });
             } catch (err) {
                 console.warn('Failed to auto-save template:', err);
