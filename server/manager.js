@@ -879,7 +879,7 @@ app.post('/api/containers/:id/restart-policy', async (req, res) => {
 });
 
 app.post('/api/containers/create', async (req, res) => {
-  const { name, image, env, ports, volumes, restart, labels, network, entrypoint, cmd, capAdd, devices, sysctls, containerId: editContainerId, networkIp } = req.body;
+  const { name, image, env, ports, volumes, restart, labels, network, entrypoint, cmd, capAdd, devices, sysctls, containerId: editContainerId, networkIp, privileged } = req.body;
 
 
   // 设置响应头支持流式输出
@@ -1010,7 +1010,8 @@ app.post('/api/containers/create', async (req, res) => {
         NetworkMode: network || 'bridge',
         CapAdd: capAdd || [],
         Devices: devices || [],
-        Sysctls: sysctls || {}
+        Sysctls: sysctls || {},
+        Privileged: privileged === true,
       },
       Entrypoint: entrypoint,
       Cmd: cmd
@@ -1059,6 +1060,7 @@ app.post('/api/containers/create', async (req, res) => {
     if (capAdd) capAdd.forEach(c => runCommand += ` --cap-add ${c}`);
     if (devices) devices.forEach(d => runCommand += ` --device ${d.PathOnHost}:${d.PathInContainer}:${d.CgroupPermissions}`);
     if (sysctls) Object.entries(sysctls).forEach(([k, v]) => runCommand += ` --sysctl ${k}=${v}`);
+    if (privileged === true) runCommand += ` --privileged`;
     // IMPORTANT: IMAGE 必须在 COMMAND 之前！docker run [OPTIONS] IMAGE [COMMAND]
     // cmd 在 image 之前是严重 Bug：Docker 会把 cmd[0] 当镜像名（如 "node" → 官方 node 镜像）
     runCommand += ` ${image}`;
@@ -1787,7 +1789,8 @@ app.post('/api/parse-compose', (req, res) => {
       devices: [],
       sysctls: {},
       iconUrl: '',
-      webUi: ''
+      webUi: '',
+      privileged: false,
     };
 
     // 容器名
@@ -1902,6 +1905,9 @@ app.post('/api/parse-compose', (req, res) => {
       : labels;
     if (labelObj.ICON_URL) result.iconUrl = labelObj.ICON_URL;
     if (labelObj.WEBUI_URL) result.webUi = labelObj.WEBUI_URL;
+
+    // Privileged
+    if (serviceDef.privileged === true) result.privileged = true;
 
     res.json({ ok: true, data: result, serviceName });
   } catch (err) {

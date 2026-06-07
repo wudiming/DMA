@@ -26,6 +26,7 @@ import { useEndpoint } from '../context/EndpointContext';
 import EndpointSelector from '../components/EndpointSelector';
 
 import { APP_VERSION } from '../constants';
+import GlassSelect from '../components/GlassSelect';
 
 export default function Networks() {
     const { t, i18n } = useTranslation();
@@ -617,18 +618,19 @@ function CreateNetworkModal({ isOpen, onClose, isDark, onCreated }) {
                     {/* ── 驱动类型 ── */}
                     <div className="space-y-1.5">
                         <label className={labelCls}>{t('network.driver')}</label>
-                        <select
+                        <GlassSelect
                             value={formData.Driver}
-                            onChange={e => handleDriverChange(e.target.value)}
-                            className={`${inputCls} cursor-pointer`}
-                        >
-                            <option value="bridge">bridge — 标准桥接网络（默认）</option>
-                            <option value="macvlan">macvlan — 容器直接接入物理网络</option>
-                            <option value="ipvlan">ipvlan — 共享 MAC 的虚拟网络</option>
-                            <option value="overlay">overlay — 跨主机 Swarm 网络</option>
-                            <option value="host">host — 共享宿主机网络栈</option>
-                            <option value="null">null — 完全隔离（无网络）</option>
-                        </select>
+                            onChange={val => handleDriverChange(val)}
+                            isDark={isDark}
+                            options={[
+                                { value: 'bridge', label: 'bridge — 标准桥接网络（默认）' },
+                                { value: 'macvlan', label: 'macvlan — 容器直接接入物理网络' },
+                                { value: 'ipvlan', label: 'ipvlan — 共享 MAC 的虚拟网络' },
+                                { value: 'overlay', label: 'overlay — 跨主机 Swarm 网络' },
+                                { value: 'host', label: 'host — 共享宿主机网络栈' },
+                                { value: 'null', label: 'null — 完全隔离（无网络）' },
+                            ]}
+                        />
                     </div>
 
                     {/* ── host / null 驱动说明 ── */}
@@ -680,15 +682,12 @@ function CreateNetworkModal({ isOpen, onClose, isDark, onCreated }) {
                                 <label className={labelCls}>
                                     工作模式
                                 </label>
-                                <select
+                                <GlassSelect
                                     value={formData.VlanMode}
-                                    onChange={e => set({ VlanMode: e.target.value })}
-                                    className={`${inputCls} cursor-pointer`}
-                                >
-                                    {(formData.Driver === 'macvlan' ? MACVLAN_MODES : IPVLAN_MODES).map(m => (
-                                        <option key={m.value} value={m.value}>{m.label}</option>
-                                    ))}
-                                </select>
+                                    onChange={val => set({ VlanMode: val })}
+                                    isDark={isDark}
+                                    options={(formData.Driver === 'macvlan' ? MACVLAN_MODES : IPVLAN_MODES)}
+                                />
                             </div>
                         </div>
                     )}

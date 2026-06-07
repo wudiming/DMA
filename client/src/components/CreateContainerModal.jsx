@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Terminal, Layout, ArrowRight, Image as ImageIcon, Plus, Trash2, CheckCircle, AlertCircle, Download, Loader2 } from 'lucide-react';
+import { X, Terminal, Layout, ArrowRight, Image as ImageIcon, Plus, Trash2, CheckCircle, AlertCircle, Download, Loader2, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import GlassSelect from './GlassSelect';
 
 import { useEndpoint } from '../context/EndpointContext';
 
@@ -28,7 +29,8 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
         cmd: '',
         capAdd: [],
         devices: [],
-        sysctls: []
+        sysctls: [],
+        privileged: false,
     });
     const [showIconInput, setShowIconInput] = useState(false);
     const [showWebUiInput, setShowWebUiInput] = useState(false);
@@ -85,7 +87,8 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 cmd: initialData.cmd || '',
                 capAdd: initialData.capAdd || [],
                 devices: initialData.devices || [],
-                sysctls: initialData.sysctls || []
+                sysctls: initialData.sysctls || [],
+                privileged: initialData.privileged || false,
             });
             if (isCustomNet) setCustomNetwork(initNetwork);
             if (initialData.iconUrl) setShowIconInput(true);
@@ -271,7 +274,8 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 cmd: '',
                 capAdd: [],
                 devices: [],
-                sysctls: []
+                sysctls: [],
+                privileged: false,
             };
 
             const knownValueFlags = ['-u', '--user', '-w', '--workdir', '-m', '--memory', '--cpus', '--gpus', '--shm-size', '--mac-address', '--hostname', '-h', '--dns', '--ip', '--network-alias', '--add-host'];
@@ -291,7 +295,9 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                     continue;
                 }
                 
-                if (arg === '--name') {
+                if (arg === '--privileged') {
+                    newData.privileged = true;
+                } else if (arg === '--name') {
                     newData.name = parsedArgs[++i];
                 } else if (arg === '-p' || arg === '--publish') {
                     newData.ports.push(parsedArgs[++i]);
@@ -589,7 +595,8 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                 sysctls: formData.sysctls.reduce((acc, curr) => {
                     if (curr.key && curr.value) acc[curr.key] = curr.value;
                     return acc;
-                }, {})
+                }, {}),
+                privileged: formData.privileged || false,
             };
 
 
@@ -925,20 +932,17 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                         <label className={`block text-sm font-medium whitespace-nowrap ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                                                             {t('container.template_select')}
                                                         </label>
-                                                        <select
+                                                        <GlassSelect
                                                             value={selectedTemplate}
-                                                            onChange={handleTemplateSelect}
-                                                            className={`flex-1 px-3 py-1.5 text-sm rounded-md border ${
-                                                                isDark
-                                                                    ? 'bg-gray-800/50 border-white/10 text-gray-100 [&>option]:bg-gray-800'
-                                                                    : 'bg-white border-gray-200 text-gray-900'
-                                                            } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                                                        >
-                                                            <option value="">{t('container.no_template')}</option>
-                                                            {templates.map(t => (
-                                                                <option key={t.id} value={t.id}>{t.name}</option>
-                                                            ))}
-                                                        </select>
+                                                            onChange={(val) => handleTemplateSelect({ target: { value: val } })}
+                                                            isDark={isDark}
+                                                            size="sm"
+                                                            className="flex-1"
+                                                            options={[
+                                                                { value: '', label: t('container.no_template') },
+                                                                ...templates.map(tmpl => ({ value: tmpl.id, label: tmpl.name }))
+                                                            ]}
+                                                        />
                                                         {selectedTemplate && (
                                                             <button
                                                                 type="button"
@@ -1068,20 +1072,17 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                                                         {t('container.restart_policy')}
                                                     </label>
-                                                    <select
+                                                    <GlassSelect
                                                         value={formData.restart}
-                                                        onChange={(e) => setFormData({ ...formData, restart: e.target.value })}
-                                                        className={`w-full px-4 py-2 rounded-lg border ${
-                                                            isDark
-                                                                ? 'bg-gray-800/50 border-white/10 text-gray-100 [&>option]:bg-gray-800'
-                                                                : 'bg-gray-50 border-gray-200 text-gray-900'
-                                                        } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                                                    >
-                                                        <option value="no">{t('common.restart_no')}</option>
-                                                        <option value="always">{t('common.restart_always')}</option>
-                                                        <option value="on-failure">{t('common.restart_on_failure')}</option>
-                                                        <option value="unless-stopped">{t('common.restart_unless_stopped')}</option>
-                                                    </select>
+                                                        onChange={(val) => setFormData({ ...formData, restart: val })}
+                                                        isDark={isDark}
+                                                        options={[
+                                                            { value: 'no', label: t('common.restart_no') },
+                                                            { value: 'always', label: t('common.restart_always') },
+                                                            { value: 'on-failure', label: t('common.restart_on_failure') },
+                                                            { value: 'unless-stopped', label: t('common.restart_unless_stopped') },
+                                                        ]}
+                                                    />
                                                 </div>
                                             </div>
                                         )}
@@ -1093,20 +1094,17 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                                                         {t('container.network_mode')}
                                                     </label>
-                                                    <select
+                                                    <GlassSelect
                                                         value={formData.network}
-                                                        onChange={(e) => setFormData({ ...formData, network: e.target.value })}
-                                                        className={`w-full px-4 py-2 rounded-lg border ${
-                                                            isDark
-                                                                ? 'bg-gray-800/50 border-white/10 text-gray-100 [&>option]:bg-gray-800'
-                                                                : 'bg-gray-50 border-gray-200 text-gray-900'
-                                                        } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                                                    >
-                                                        <option value="bridge">{t('common.network_bridge')}</option>
-                                                        <option value="host">{t('common.network_host')}</option>
-                                                        <option value="none">{t('common.network_none')}</option>
-                                                        <option value="custom">{t('common.network_custom')}</option>
-                                                    </select>
+                                                        onChange={(val) => setFormData({ ...formData, network: val })}
+                                                        isDark={isDark}
+                                                        options={[
+                                                            { value: 'bridge', label: t('common.network_bridge') },
+                                                            { value: 'host', label: t('common.network_host') },
+                                                            { value: 'none', label: t('common.network_none') },
+                                                            { value: 'custom', label: t('common.network_custom') },
+                                                        ]}
+                                                    />
                                                     {formData.network === 'custom' && (
                                                         <div className="mt-2 space-y-2">
                                                             {/* 自定义网络名 */}
@@ -1272,6 +1270,50 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                         {/* Advanced Tab */}
                                         {activeTab === 'advanced' && (
                                             <div className="space-y-6">
+
+                                                {/* Privileged Mode */}
+                                                <div className={`p-4 rounded-xl border transition-all ${
+                                                    formData.privileged
+                                                        ? isDark
+                                                            ? 'border-orange-500/40 bg-orange-500/10'
+                                                            : 'border-orange-400 bg-orange-50'
+                                                        : isDark
+                                                            ? 'border-white/10 bg-white/5'
+                                                            : 'border-gray-200 bg-gray-50'
+                                                }`}>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            <Shield className={`w-5 h-5 ${formData.privileged ? 'text-orange-400' : isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+                                                            <div>
+                                                                <div className={`text-sm font-semibold ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                                                                    特权模式 (Privileged)
+                                                                </div>
+                                                                <div className={`text-xs mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                                    等价于 <code className="font-mono bg-black/20 px-1 rounded">--privileged</code>，授予容器几乎所有 capabilities 并允许访问宿主设备
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {/* Toggle switch */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFormData(prev => ({ ...prev, privileged: !prev.privileged }))}
+                                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                                                                formData.privileged ? 'bg-orange-500' : isDark ? 'bg-gray-600' : 'bg-gray-300'
+                                                            }`}
+                                                        >
+                                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                                                                formData.privileged ? 'translate-x-6' : 'translate-x-1'
+                                                            }`} />
+                                                        </button>
+                                                    </div>
+                                                    {formData.privileged && (
+                                                        <div className={`mt-3 flex items-start gap-2 text-xs rounded-lg px-3 py-2 ${isDark ? 'bg-orange-900/30 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>
+                                                            <span>⚠️</span>
+                                                            <span>特权模式会绕过容器安全隔离，仅在确实需要时启用（如 Docker-in-Docker、NFS 挂载等场景）。</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
                                                 <div className="space-y-4">
                                                     <div>
                                                         <label className={`block text-sm font-medium mb-1.5 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -1298,6 +1340,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                         />
                                                     </div>
                                                 </div>
+
 
                                                 {/* Capabilities */}
                                                 <div>
@@ -1523,6 +1566,7 @@ export default function CreateContainerModal({ isDark, onClose, onSuccess, initi
                                                     iconUrl: d.iconUrl || prev.iconUrl,
                                                     webUi: d.webUi || prev.webUi,
                                                     alwaysPull: false,
+                                                    privileged: d.privileged === true ? true : prev.privileged,
                                                 }));
                                                 if (isCustomNet) setCustomNetwork(d.network);
                                                 if (d.iconUrl) setShowIconInput(true);

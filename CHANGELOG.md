@@ -8,14 +8,25 @@
   - 命令模式内新增 `Docker Run / Compose` 子模式切换器（分段控件样式）
   - Compose 区块：粘贴单容器 Compose YAML（支持完整 compose 文件含单 service 或直接粘贴服务配置块）→ 点击「解析并填入表单」自动填充所有字段后切换至表单模式
   - Docker Run 区块：保留原有「解析并填入表单」+「直接运行」功能，布局优化，移除冗余取消按钮
-  - 后端新增 `/api/parse-compose` 接口（使用已内置的 `js-yaml`），支持解析：image、container_name、ports、volumes、environment（数组/对象格式）、restart、network_mode/networks、entrypoint、command、cap_add、devices、sysctls、labels（ICON_URL/WEBUI_URL）
+  - 后端新增 `/api/parse-compose` 接口（使用已内置的 `js-yaml`），支持解析：image、container_name、ports、volumes、environment（数组/对象格式）、restart、network_mode/networks、entrypoint、command、cap_add、devices、sysctls、privileged、labels（ICON_URL/WEBUI_URL）
   - 自定义网络自动识别并回填 customNetwork 状态
+
+- **特权模式 (Privileged)**：高级配置页新增 Privileged 模式开关
+  - 等价于 `docker run --privileged`，授予容器几乎所有 Linux capabilities 并允许访问宿主机设备
+  - 启用时显示橙色警告卡片，提示安全风险（Docker-in-Docker、NFS 挂载等场景）
+  - 支持 docker run 命令解析（`--privileged` 标志）、Compose YAML 解析（`privileged: true`）
+  - 后端 `HostConfig.Privileged` 正确传递到 Docker API；日志命令中展示 `--privileged`
+
+- **自定义下拉菜单组件 (GlassSelect)**：新建 `GlassSelect.jsx` 自定义下拉组件
+  - 彻底解决原生 `<select>` 展开列表无法控制背景色/透明度的问题
+  - 采用 glassmorphism 风格：触发器 `bg-white/5 hover:bg-white/10`，下拉列表 `bg-gray-900/95 backdrop-blur-xl`
+  - 当前选中项高亮为青色（cyan），其余选项 hover 白色半透明
+  - 支持 size（sm/md）、disabled、placeholder 等参数
+  - 已应用于：创建容器（模板选择、重启策略、网络模式）、创建网络（驱动类型、工作模式）
 
 - **网络详情弹窗**：NetworkCard 新增「眼睛」详情按钮
   - 展示：ID、驱动、作用域、Internal/Attachable/IPv6、创建时间
-  - IPAM：IPv4/IPv6 子网 + 网关
-  - 驱动选项（Options）列表
-  - 已连接容器（名称、IPv4、MAC）
+  - IPAM：IPv4/IPv6 子网 + 网关；驱动选项（Options）列表；已连接容器（名称、IPv4、MAC）
   - 顶部说明：Docker 网络创建后核心属性不可修改，如需变更请删除重建
 
 ### 修复
